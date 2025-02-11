@@ -22,7 +22,7 @@ services:
         docking_server_config_path:=/config/docking_server.yaml
         apriltag_config_path:=/config/apriltag.yaml
         apriltag_size:=0.08
-        use_sim:=True
+        use_sim:=False
 
   navigation:
     image: husarion/husarion-ugv-autonomy:humble-0.1.0-20250210-stable
