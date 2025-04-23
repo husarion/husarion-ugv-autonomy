@@ -110,7 +110,17 @@ In the example below for dock named `main` the position is `pose: [1.0, 1.20, 1.
 [...]
 ```
 
+### 🔧 Configure OS
+
+Setup OS:
+
+```bash
+just setup-os
+```
+
+
 ### 🚀 Step 2: Run Docking
+
 
 Run Docking nodes:
 
