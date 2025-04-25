@@ -82,3 +82,6 @@ undock:
     #!/bin/bash
     docker compose -f compose.simulation.yaml exec docking bash -c \
      "source install/setup.bash && ros2 action send_goal /panther/undock_robot opennav_docking_msgs/action/UndockRobot \" {  dock_type: charging_dock }\""
+
+setup-os:
+    bash setup_os.sh
