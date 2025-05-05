@@ -2,12 +2,15 @@ x-common-config:
   &common-config
   network_mode: host
   ipc: host
+  restart: always
 
 
 services:
   luxonis:
     image: husarion/depthai:humble-v2.10.3
+    container_name: luxonis
     <<: *common-config
+    privileged: true
     volumes:
       - /dev/bus/usb:/dev/bus/usb
       - ../config:/config
@@ -23,6 +26,7 @@ services:
 
   luxonis_static_transform:
     image: husarion/husarion-ugv-autonomy:humble-0.1.0-20250210-stable
+    container_name: luxonis_static_transform
     <<: *common-config
     volumes:
       - ../config:/config
@@ -30,4 +34,4 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - CYCLONE_DDS_URI=file:///config/cyclonedds.xml
     command: >
-      ros2 run tf2_ros static_transform_publisher 0.2 0.0 0.2 0 0 0 panther/cover_link oak-d-base-frame
+      ros2 run tf2_ros static_transform_publisher 0.19 0.0 0.07 0 0 0 lynx/cover_link oak-d-base-frame

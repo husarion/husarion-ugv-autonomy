@@ -2,13 +2,13 @@
   ros__parameters:
     controller_frequency: 50.0
     initial_perception_timeout: 5.0
-    wait_charge_timeout: 10.0
+    wait_charge_timeout: 30.0
     dock_approach_timeout: 20.0
     undock_linear_tolerance: 0.19
     undock_angular_tolerance: 0.08
     max_retries: 3
-    base_frame: "<robot_namespace>/wibotic_receiver_link" # Distance to the dock is calculated from this frame
-    fixed_frame: "<robot_namespace>/odom"
+    base_frame: <robot_namespace>/wibotic_receiver_link # Distance to the dock is calculated from this frame
+    fixed_frame: <robot_namespace>/odom
     dock_backwards: false
     dock_prestaging_tolerance: 0.15
 
@@ -21,8 +21,8 @@
       docking_yaw_threshold: 0.2
       staging_x_offset: -0.8
       filter_coef: 0.1
-      use_wibotic_info: <use_wibotic_info_param>
-      wibotic_info_timeout: 1.0
+      use_wibotic_info: false
+      wibotic_info_timeout: 2.0
 
     docks: ["main"]
     main:

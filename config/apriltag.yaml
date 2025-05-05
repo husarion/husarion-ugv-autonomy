@@ -1,7 +1,7 @@
 ---
 /**:
   ros__parameters:
-    image_transport: raw
+    image_transport: compressed
     family: 36h11
     size: 0.08
     profile: false

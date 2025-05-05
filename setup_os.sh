@@ -21,7 +21,7 @@ SETUP_CAN_SH="/usr/local/sbin/setup_can0.sh"
 echo "Creating $SETUP_CAN_SH..."
 cat <<'EOF' | sudo tee "$SETUP_CAN_SH"
 #!/bin/bash
-slcand -o -s6 -t hw -S 3000000 /dev/ttyACM0 can0
+slcand -o -s8 -t hw -S 3000000 /dev/ttyACM0 can0
 ip link set up can0
 EOF
 

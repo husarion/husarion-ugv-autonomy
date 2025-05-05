@@ -37,11 +37,11 @@
       i_calibration_file: ''
       i_disable_node: false
       i_enable_feature_tracker: false
-      i_enable_lazy_publisher: true
+      i_enable_lazy_publisher: false
       i_enable_nn: false
       i_enable_preview: false
       i_exposure_offset: 0
-      i_fps: 30.0
+      i_fps: 15.0
       i_fsync_continuous: false
       i_fsync_trigger: false
       i_get_base_device_timestamp: false
@@ -52,7 +52,7 @@
       i_keep_preview_aspect_ratio: true
       i_low_bandwidth: false
       i_low_bandwidth_quality: 50
-      i_max_q_size: 30
+      i_max_q_size: 1
       i_output_isp: true
       i_preview_height: 300
       i_preview_size: 300
@@ -88,7 +88,7 @@
       i_enable_decimation_filter: false
       i_enable_disparity_shift: false
       i_enable_distortion_correction: false
-      i_enable_lazy_publisher: true
+      i_enable_lazy_publisher: false
       i_enable_spatial_filter: false
       i_enable_spatial_nn: false
       i_enable_speckle_filter: false
@@ -108,7 +108,7 @@
       i_low_bandwidth_quality: 50
       i_lr_check: true
       i_lrc_threshold: 10
-      i_max_q_size: 30
+      i_max_q_size: 1
       i_output_disparity: false
       i_publish_left_rect: false
       i_publish_right_rect: false

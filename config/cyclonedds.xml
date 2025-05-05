@@ -4,6 +4,8 @@
         <General>
             <Interfaces>
                 <NetworkInterface name="eth0" />
+                <AllowMulticast>spdp</AllowMulticast>
+                <MaxMessageSize>65500B</MaxMessageSize>
             </Interfaces>
         </General>
     </Domain>
