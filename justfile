@@ -36,7 +36,12 @@ start-hardware:
     #!/bin/bash
     docker compose -f compose.hardware.yaml down
     docker compose -f compose.hardware.yaml pull
-    docker compose -f compose.hardware.yaml up
+    docker compose -f compose.hardware.yaml up navigation
+
+# Start docking for hardware
+start-hardware-docking:
+    #!/bin/bash
+    docker compose -f compose.hardware.yaml up docking
 
 # Start Gazebo simulator with navigation stack
 start-simulation:
@@ -44,7 +49,12 @@ start-simulation:
     xhost +local:docker
     docker compose -f compose.simulation.yaml down
     docker compose -f compose.simulation.yaml pull
-    docker compose -f compose.simulation.yaml up
+    docker compose -f compose.simulation.yaml up gazebo navigation
+
+# Start docking for simulation
+start-simulation-docking:
+    #!/bin/bash
+    docker compose -f compose.simulation.yaml up docking
 
 # Configure and run Husarion WebUI
 start-visualization: check-husarion-webui

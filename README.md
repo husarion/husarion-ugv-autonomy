@@ -122,10 +122,16 @@ just setup-os
 ### 🚀 Step 2: Run Docking
 
 
-Run Docking nodes:
+Run Docking nodes in case of simulation:
 
 ```bash
-just start-docking
+just start-simulation-docking
+```
+
+for real robot:
+
+```bash
+just start-hardware-docking
 ```
 
 ### ⚓ Step 2: Dock the robot
