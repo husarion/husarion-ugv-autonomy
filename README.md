@@ -55,7 +55,7 @@ export SLAM=True # if you have a map you can run navigation without SLAM
 🤖 Run Navigation on the Physical Robot:
 
 ```bash
-just start-hardware
+just start-hardware-navigation
 ```
 
 🖥️ Run Navigation in Simulation:
@@ -133,7 +133,7 @@ just start-hardware-docking
 just start-simulation-docking
 ```
 
-### ⚓ Step 2: Dock the robot
+### ⚓ Step 3: Dock the robot
 
 Run Docking sequence:
 
@@ -141,7 +141,7 @@ Run Docking sequence:
 just dock main
 ```
 
-### 🛩️ Step 3: Undock the robot
+### 🛩️ Step 4: Undock the robot
 
 Run Undocking sequence:
 

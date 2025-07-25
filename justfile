@@ -44,7 +44,7 @@ start-hardware-docking:
     docker compose -f compose.hardware.yaml up docking
 
 # Start Gazebo simulator with navigation stack
-start-simulation:
+start-simulation-navigation:
     #!/bin/bash
     xhost +local:docker
     docker compose -f compose.simulation.yaml down
