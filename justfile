@@ -32,7 +32,7 @@ check-husarion-webui:
     fi
 
 # Start navigation on User Computer inside Husarion UGV
-start-hardware:
+start-hardware-navigation:
     #!/bin/bash
     docker compose -f compose.hardware.yaml down
     docker compose -f compose.hardware.yaml pull
@@ -44,7 +44,7 @@ start-hardware-docking:
     docker compose -f compose.hardware.yaml up docking
 
 # Start Gazebo simulator with navigation stack
-start-simulation-navigation:
+start-simulation:
     #!/bin/bash
     xhost +local:docker
     docker compose -f compose.simulation.yaml down
