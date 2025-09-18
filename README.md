@@ -2,7 +2,7 @@
 
 A collection of packages containing autonomous functionalities for Husarion UGV vehicles.
 
-![autonomy-result](https://github-readme-figures.s3.eu-central-1.amazonaws.com/panther/husarion_ugv/husarion_ugv_autonomy.gif)
+![autonomy-result](https://github-readme-figures.s3.eu-central-1.amazonaws.com/panther/husarion_ugv/husarion_ugv_autonomy.webp)
 
 ## 🚀 Demo
 
