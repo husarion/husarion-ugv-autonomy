@@ -1,6 +1,6 @@
 # 🚀 Simulation Demo
 
-This is a basic demo that's a good place to start when preparing your robot for navigation, so you can familiarize yourself with the basic concepts in this repository. When launched in this example, The Panther will be equipped with the following devices, which were added using the [configuration.yaml](./docker/config/components.yaml) file.
+This is a basic demo that's a good place to start when preparing your robot for navigation, so you can familiarize yourself with the basic concepts in this repository. When launched in this example, The Panther will be equipped with the following devices, which were added using the [configuration.yaml](./config/components.yaml) file.
 
 - Velodyne Puck
 - RPLIDAR S3
@@ -56,5 +56,5 @@ just undock
 
 After reviewing this demonstration, we encourage you to experiment and familiarize yourself with the autonomous functionality and use this knowledge to configure the physical robot accordingly. Check:
 
-- [compose.simulation.yaml](./docker/compose.simulation.yaml)
+- [compose.simulation.yaml](./compose.simulation.yaml)
 - [Hardware Demo](demo-hw.md)
