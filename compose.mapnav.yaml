@@ -3,8 +3,10 @@
 #
 #   docker compose -f compose.mapnav.yaml up -d
 #
-# The Ouster LiDAR driver runs here too (demo-mapnav.md). Every value below has a default; override
-# it in the shell or in a `.env.mapnav` passed with --env-file.
+# The Ouster LiDAR driver runs here too (demo-mapnav.md). The OAK's video for the Cockpit is two more
+# services behind the `oak` profile, off unless `--profile oak` is given (demo-mapnav.md §7).
+# Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
+# --env-file.
 
 x-common-config: &common-config
   network_mode: host
@@ -59,3 +61,56 @@ services:
         map:=/maps/${MAP_NAME:-map}/map.yaml
         initial_pose_from_sidecar:=True
         use_sim_time:=False
+
+  # The OAK's video for the Cockpit (demo-mapnav.md §7). Off unless asked: `--profile oak`.
+  # On-chip H.264 from stock depthai-ros, relayed as CompressedVideo, which the airlock carries
+  # through one inbound lane to the robot's camera node. No raw image leaves this computer, and
+  # the OAK stays out of navigation.
+  oak:
+    # PIN: replace the tag with `jazzy-map-nav@sha256:<digest>` once CI has built depthai-docker
+    # map-nav (both architectures).
+    image: husarion/depthai:jazzy-map-nav
+    profiles: [oak]
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+    # The robot's URDF places the OAK (components.yaml, CAM11), so no description or transform is
+    # published here: camera_node runs alone, not camera.launch.py. RGB only, encoded on the
+    # chip as H.264 baseline (profile 0, no B-frames), published as FFMPEGPacket on
+    # oak/rgb/image_raw/compressed. A keyframe every 30 frames: one a second at 30 fps.
+    command: >
+      ros2 run depthai_ros_driver camera_node --ros-args
+        -r __node:=oak
+        -r __ns:=/${ROBOT_NAMESPACE:-panther}
+        -p camera.i_ip:=${OAK_IP:-10.15.20.6}
+        -p camera.i_pipeline_type:=RGB
+        -p camera.i_nn_type:=none
+        -p camera.i_enable_imu:=false
+        -p pipeline_gen.i_enable_imu:=false
+        -p camera.i_enable_ir:=false
+        -p camera.i_publish_tf_from_calibration:=false
+        -p camera.i_restart_on_diagnostics_error:=true
+        -p rgb.i_fps:=30.0
+        -p rgb.i_low_bandwidth:=true
+        -p rgb.i_low_bandwidth_profile:=0
+        -p rgb.i_low_bandwidth_bitrate:=${OAK_BITRATE:-3400000}
+        -p rgb.i_low_bandwidth_frame_freq:=30
+        -p rgb.i_publish_compressed:=true
+
+  # Copies the OAK's FFMPEGPacket into a foxglove_msgs/CompressedVideo on oak/rgb/image_raw/h264,
+  # bytes unchanged. The airlock image cannot carry FFMPEGPacket yet; when it can (airlock
+  # 1.30.0), remove this service and let the lane carry oak/rgb/image_raw/compressed.
+  oak_relay:
+    # PIN: the relay is in the autonomy image from husarion_ugv_autonomy_ros map-nav c249ca7 on.
+    # Replace with `jazzy-map-nav-<sha7>@sha256:<digest>` from that build (the same image as
+    # `navigation` once it is repinned).
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav
+    profiles: [oak]
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+    command: >
+      ros2 run husarion_ugv_video_relay ffmpeg_to_compressed_video --ros-args
+        -r __ns:=/${ROBOT_NAMESPACE:-panther}
+        -r input:=oak/rgb/image_raw/compressed
+        -r output:=oak/rgb/image_raw/h264

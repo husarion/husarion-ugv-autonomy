@@ -8,6 +8,8 @@ This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user comp
 - **Recoveries pass the same chain.** Spin and back-up go through the smoother and the collision monitor too.
 - **The 3D cloud also feeds the costmaps.** A 2D slice of it, 0.25 m to 1.0 m above the ground, feeds slam_toolbox and AMCL.
 
+- **The OAK's video, if you ask for it** (§7): the OAK encodes H.264 on its own chip, and the airlock carries that stream to the robot's Cockpit. No raw image leaves the user computer, and the OAK stays out of navigation.
+
 The older demos (`compose.hardware.yaml`, `compose.simulation.yaml`, `demo-hw.md`, `demo-sim.md`) are unchanged.
 
 > **This is a reference project, not a product.** Tune it for your robot and your site. Keep the e-stop in reach whenever the robot drives autonomously.
@@ -100,6 +102,7 @@ The settings, each with its default:
 | `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` | `0.25`, `1.0` | The 2D slice for SLAM and AMCL, in metres above the ground: above grass and kerbs, below the canopy. On a slope the ground can enter the slice at range; raise the floor if you see arcs of ground in the map |
 | `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
+| `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
@@ -130,5 +133,55 @@ The stack refuses to start when the sidecar is missing, has no `saved_pose`, or 
 ## 6. Stop
 
 ```bash
-docker compose -f compose.mapnav.yaml down
+docker compose -f compose.mapnav.yaml --profile oak down
+```
+
+`--profile oak` also stops the OAK's two services when they run (§7); without them it changes nothing.
+
+## 7. The OAK's video in the Cockpit (optional)
+
+An OAK-D Pro PoE on the robot's LAN (`10.15.20.6` on the reference robots) can show its colour camera in the Cockpit. Two services do it, both behind the compose profile `oak`, so nothing about them starts unless you ask:
+
+- **`oak`** runs stock depthai-ros (`husarion/depthai`, depthai-ros 2.13.0). The OAK encodes its colour stream as H.264 on its own chip and the driver publishes it as `ffmpeg_image_transport_msgs/FFMPEGPacket` on `/$NS/oak/rgb/image_raw/compressed`, about 0.4 MB/s at 1280×720 and 30 fps. No raw image is published.
+- **`oak_relay`** copies each packet's bytes into a `foxglove_msgs/CompressedVideo` on `/$NS/oak/rgb/image_raw/h264`, with no decode and no re-encode. The robot's airlock carries `CompressedVideo` but not yet `FFMPEGPacket`; the relay goes when it does.
+
+On the robot, Husarion UGV OS carries `/$NS/oak/rgb/image_raw/h264` to its camera node through an inbound H.264 lane, and the camera node passes the stream to the Cockpit as it is. That lane is part of the robot's own configuration (UGV OS), not of this project.
+
+If the `husarion-depthai` snap is installed on the user computer, stop it first. Two drivers would fight over the camera:
+
+```bash
+sudo snap stop --disable husarion-depthai
+```
+
+Describe the OAK in `components.yaml` as well (Manage › Robot › Driver files), so its frames are on the robot's TF tree like the LiDAR's. `CAM11` is the OAK-D Pro; measure `xyz` and `rpy` on your robot, these values are only an example:
+
+```yaml
+  - type: CAM11            # Luxonis OAK-D Pro
+    parent_link: mount_link
+    xyz: 0.20 0.0 0.10     # yours
+    rpy: 0.0 0.0 0.0
+```
+
+Start the stack with the OAK:
+
+```bash
+ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile oak up -d
+```
+
+What the `oak` service sets, and why:
+
+| Setting | Why |
+| -- | -- |
+| `camera_node`, not `camera.launch.py` | The launch file also publishes the camera's own description and transforms; the robot's URDF already places the OAK (`CAM11`) |
+| `camera.i_ip:=$OAK_IP` (default `10.15.20.6`) | The PoE camera's address |
+| `camera.i_pipeline_type:=RGB`, `camera.i_nn_type:=none`, IMU and IR off | The colour camera only: no depth, no network on the chip, no IR projector |
+| `rgb.i_low_bandwidth:=true`, `rgb.i_publish_compressed:=true` | The chip encodes, and the driver publishes the encoded stream instead of raw frames |
+| `rgb.i_low_bandwidth_profile:=0` | H.264 baseline: no B-frames, so the browser shows each frame as it arrives |
+| `rgb.i_low_bandwidth_bitrate:=$OAK_BITRATE` (default 3.4 Mbit/s), `rgb.i_low_bandwidth_frame_freq:=30` | The bitrate of the reference robots' snap; a keyframe every second at 30 fps, so a new viewer waits at most a second for a picture |
+| `rgb.i_fps:=30.0` | 30 frames a second at the driver's default 1280×720 |
+
+Check that the stream arrives at 30 Hz on the user computer:
+
+```bash
+docker compose -f compose.mapnav.yaml exec oak_relay bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/h264"
 ```

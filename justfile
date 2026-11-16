@@ -91,9 +91,13 @@ setup-os:
 mapnav-up:
     docker compose -f compose.mapnav.yaml up -d
 
-# Stop the map-nav stack
+# Start the map-nav stack with the OAK's video for the Cockpit (demo-mapnav.md §7)
+mapnav-oak-up:
+    docker compose -f compose.mapnav.yaml --profile oak up -d
+
+# Stop the map-nav stack (with the OAK's services, when they run)
 mapnav-down:
-    docker compose -f compose.mapnav.yaml down
+    docker compose -f compose.mapnav.yaml --profile oak down
 
 # Follow the map-nav stack's logs
 mapnav-logs:
