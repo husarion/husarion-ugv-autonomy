@@ -9,12 +9,14 @@
 x-common-config: &common-config
   network_mode: host
   ipc: host
-  env_file: mapnav.env
+  env_file: mapnav.env  # CYCLONEDDS_URI points into ./config/mapnav, so every service mounts it
 
 services:
   ouster:
     image: husarion/ouster:jazzy-map-nav@sha256:f1d681a3294cb2dd1564383380e34a3f352e9105feda0daaff52eb3ad1e7aa20
     <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
     # The robot's URDF places the sensor (components.yaml), so the driver publishes no transform
     # and stamps the cloud in the URDF's lidar frame. Sensor data, best effort.
     command: >
