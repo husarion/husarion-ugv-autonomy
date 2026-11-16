@@ -1,0 +1,59 @@
+# Map-nav: Nav2 with slam_toolbox (or AMCL on a saved map) on the user computer of a Husarion UGV
+# running Husarion UGV OS, behind the robot's airlock. See demo-mapnav.md.
+#
+#   docker compose -f compose.mapnav.yaml up -d
+#
+# The Ouster LiDAR driver runs here too (demo-mapnav.md). Every value below has a default; override
+# it in the shell or in a `.env.mapnav` passed with --env-file.
+
+x-common-config: &common-config
+  network_mode: host
+  ipc: host
+  env_file: mapnav.env
+
+services:
+  ouster:
+    image: husarion/ouster:jazzy-map-nav@sha256:f1d681a3294cb2dd1564383380e34a3f352e9105feda0daaff52eb3ad1e7aa20
+    <<: *common-config
+    # The robot's URDF places the sensor (components.yaml), so the driver publishes no transform
+    # and stamps the cloud in the URDF's lidar frame. Sensor data, best effort.
+    command: >
+      ros2 launch ouster_ros sensor.composite.launch.xml
+        ouster_ns:=${ROBOT_NAMESPACE:-panther}
+        sensor_hostname:=${OUSTER_HOSTNAME:-10.15.20.5}
+        lidar_mode:=1024x10
+        timestamp_mode:=TIME_FROM_ROS_TIME
+        proc_mask:=PCL
+        pub_static_tf:=false
+        sensor_frame:=${ROBOT_NAMESPACE:-panther}/ouster_link
+        lidar_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
+        point_cloud_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
+        imu_frame:=${ROBOT_NAMESPACE:-panther}/os_imu
+        use_system_default_qos:=false
+        persist_config:=false
+        attempt_reconnect:=true
+        viz:=false
+
+  navigation:
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c78444b@sha256:e449f7b424c62b566f122a8f6a2f19925e2e53167e3bd3327ae537d817691b7b
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+      - ./maps:/maps
+    command: >
+      ros2 launch husarion_ugv_navigation bringup_launch.py
+        namespace:=${ROBOT_NAMESPACE:-panther}
+        robot_model:=${ROBOT_MODEL:-panther}
+        observation_topic:=${OBSERVATION_TOPIC:-/${ROBOT_NAMESPACE:-panther}/points}
+        observation_topic_type:=pointcloud
+        lidar_profile:=${LIDAR_PROFILE:-os0_32}
+        robot_height:=${ROBOT_HEIGHT:-0.7}
+        scan_min_height:=${SCAN_MIN_HEIGHT:-0.25}
+        scan_max_height:=${SCAN_MAX_HEIGHT:-1.0}
+        use_collision_monitor:=True
+        cmd_vel_out:=autonomous/cmd_vel
+        slam:=${SLAM:-True}
+        map_update_interval:=5.0
+        map:=/maps/${MAP_NAME:-map}/map.yaml
+        initial_pose_from_sidecar:=True
+        use_sim_time:=False

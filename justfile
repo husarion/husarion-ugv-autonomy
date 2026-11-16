@@ -86,3 +86,15 @@ undock:
 
 setup-os:
     bash setup_os.sh
+
+# Map-nav (demo-mapnav.md): Nav2 behind the airlock of Husarion UGV OS. Set ROBOT_NAMESPACE first.
+mapnav-up:
+    docker compose -f compose.mapnav.yaml up -d
+
+# Stop the map-nav stack
+mapnav-down:
+    docker compose -f compose.mapnav.yaml down
+
+# Follow the map-nav stack's logs
+mapnav-logs:
+    docker compose -f compose.mapnav.yaml logs -f

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  One Cyclone DDS profile for every container of compose.mapnav.yaml (the Ouster driver and Nav2),
+  mounted into each.
+
+  It matches the robot's fleet side on Husarion UGV OS (Cyclone, domain 0, `factory-hardened-mcast`):
+  multicast for participant discovery only, plus unicast peers 10.15.20.2 (the built-in computer)
+  and 10.15.20.3 (this user computer).
+
+  The interface is chosen by address, not by name: Ubuntu names Ethernet ports enp..., so the old
+  `eth0` pin never matched. If your user computer is not at 10.15.20.3 on the robot's LAN, change
+  the address below; Cyclone refuses to start when no interface has it.
+-->
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain Id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface address="10.15.20.3" />
+      </Interfaces>
+      <AllowMulticast>spdp</AllowMulticast>
+      <EnableMulticastLoopback>true</EnableMulticastLoopback>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>30</MaxAutoParticipantIndex>
+      <Peers>
+        <Peer Address="10.15.20.2" />
+        <Peer Address="10.15.20.3" />
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>
