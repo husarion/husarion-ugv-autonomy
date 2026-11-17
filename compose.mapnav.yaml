@@ -3,8 +3,8 @@
 #
 #   docker compose -f compose.mapnav.yaml up -d
 #
-# The Ouster LiDAR driver runs here too (demo-mapnav.md). The OAK's video for the Cockpit is two more
-# services behind the `oak` profile, off unless `--profile oak` is given (demo-mapnav.md §7).
+# The Ouster LiDAR driver runs here too (demo-mapnav.md). The OAK's video for the Cockpit is one more
+# service behind the `oak` profile, off unless `--profile oak` is given (demo-mapnav.md §7).
 # Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
 # --env-file.
 
@@ -65,49 +65,24 @@ services:
   # The OAK's video for the Cockpit (demo-mapnav.md §7). Off unless asked: `--profile oak`.
   # On-chip H.264 from stock depthai-ros, relayed as CompressedVideo, which the airlock carries
   # through one inbound lane to the robot's camera node. No raw image leaves this computer, and
-  # the OAK stays out of navigation.
+  # the OAK stays out of navigation. The relay is in the depthai image: when the airlock carries
+  # FFMPEGPacket (airlock 1.30.0), it goes from that image's launch file.
   oak:
-    # depthai-docker map-nav 669ee7e (stock depthai-ros 2.13.0 from apt), amd64 + arm64.
+    # PIN: repin after depthai-docker map-nav 93d2782 is built. This digest (669ee7e) has no relay
+    # and no launch/oak_h264.launch.py, so `--profile oak` fails to start until it is repinned.
     image: husarion/depthai:jazzy-map-nav@sha256:94d3187841aa6b66d65ca0fcc32152d0990887c670d865c8711d5c33a0a04a27
     profiles: [oak]
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
-    # The robot's URDF places the OAK (components.yaml, CAM12), so no description or transform is
-    # published here: camera_node runs alone, not camera.launch.py. RGB only, encoded on the
-    # chip as H.264 baseline (profile 0, no B-frames), published as FFMPEGPacket on
-    # oak/rgb/image_raw/compressed. A keyframe every 30 frames: one a second at 30 fps.
+    # depthai's camera and the H.264 relay, two components in one container (packets cross
+    # in-process). The launch file holds the camera's parameters (demo-mapnav.md §7): RGB only,
+    # encoded on the chip as H.264 baseline, a keyframe every 30 frames, no IMU, no IR, and no
+    # description or transform (the robot's URDF places the OAK, CAM12). depthai publishes
+    # FFMPEGPacket on oak/rgb/image_raw/compressed; the relay, CompressedVideo on
+    # oak/rgb/image_raw/h264.
     command: >
-      ros2 run depthai_ros_driver camera_node --ros-args
-        -r __node:=oak
-        -r __ns:=/${ROBOT_NAMESPACE:-panther}
-        -p camera.i_ip:=${OAK_IP:-10.15.20.6}
-        -p camera.i_pipeline_type:=RGB
-        -p camera.i_nn_type:=none
-        -p camera.i_enable_imu:=false
-        -p pipeline_gen.i_enable_imu:=false
-        -p camera.i_enable_ir:=false
-        -p camera.i_publish_tf_from_calibration:=false
-        -p camera.i_restart_on_diagnostics_error:=true
-        -p rgb.i_fps:=30.0
-        -p rgb.i_low_bandwidth:=true
-        -p rgb.i_low_bandwidth_profile:=0
-        -p rgb.i_low_bandwidth_bitrate:=${OAK_BITRATE:-3400000}
-        -p rgb.i_low_bandwidth_frame_freq:=30
-        -p rgb.i_publish_compressed:=true
-
-  # Copies the OAK's FFMPEGPacket into a foxglove_msgs/CompressedVideo on oak/rgb/image_raw/h264,
-  # bytes unchanged. The airlock image cannot carry FFMPEGPacket yet; when it can (airlock
-  # 1.30.0), remove this service and let the lane carry oak/rgb/image_raw/compressed.
-  oak_relay:
-    # The relay is in the autonomy image (husarion_ugv_video_relay), the same image as `navigation`.
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c249ca7@sha256:4746f17ed04ba0a0e0b6fd0b8a6956a0aa6d68f850e4b342b7c2e52ac384688a
-    profiles: [oak]
-    <<: *common-config
-    volumes:
-      - ./config/mapnav:/config/mapnav:ro
-    command: >
-      ros2 run husarion_ugv_video_relay ffmpeg_to_compressed_video --ros-args
-        -r __ns:=/${ROBOT_NAMESPACE:-panther}
-        -r input:=oak/rgb/image_raw/compressed
-        -r output:=oak/rgb/image_raw/h264
+      ros2 launch /ros2_ws/launch/oak_h264.launch.py
+        namespace:=${ROBOT_NAMESPACE:-panther}
+        ip:=${OAK_IP:-10.15.20.6}
+        bitrate:=${OAK_BITRATE:-3400000}

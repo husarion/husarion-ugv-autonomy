@@ -136,14 +136,14 @@ The stack refuses to start when the sidecar is missing, has no `saved_pose`, or 
 docker compose -f compose.mapnav.yaml --profile oak down
 ```
 
-`--profile oak` also stops the OAK's two services when they run (§7); without them it changes nothing.
+`--profile oak` also stops the OAK's service when it runs (§7); without it, it changes nothing.
 
 ## 7. The OAK's video in the Cockpit (optional)
 
-An OAK-D Pro PoE on the robot's LAN (`10.15.20.6` on the reference robots) can show its colour camera in the Cockpit. Two services do it, both behind the compose profile `oak`, so nothing about them starts unless you ask:
+An OAK-D Pro PoE on the robot's LAN (`10.15.20.6` on the reference robots) can show its colour camera in the Cockpit. One service does it, `oak`, behind the compose profile `oak`, so nothing about it starts unless you ask. It runs the depthai image (`husarion/depthai`: stock depthai-ros 2.13.0 plus Husarion's H.264 relay) with its launch file `/ros2_ws/launch/oak_h264.launch.py`, which loads two components into one container, so each packet crosses from one to the other in-process:
 
-- **`oak`** runs stock depthai-ros (`husarion/depthai`, depthai-ros 2.13.0). The OAK encodes its colour stream as H.264 on its own chip and the driver publishes it as `ffmpeg_image_transport_msgs/FFMPEGPacket` on `/$NS/oak/rgb/image_raw/compressed`, about 0.4 MB/s at 1280×720 and 30 fps. No raw image is published.
-- **`oak_relay`** copies each packet's bytes into a `foxglove_msgs/CompressedVideo` on `/$NS/oak/rgb/image_raw/h264`, with no decode and no re-encode. The robot's airlock carries `CompressedVideo` but not yet `FFMPEGPacket`; the relay goes when it does.
+- **depthai's camera** (node `oak`): the OAK encodes its colour stream as H.264 on its own chip and the driver publishes it as `ffmpeg_image_transport_msgs/FFMPEGPacket` on `/$NS/oak/rgb/image_raw/compressed`, about 0.4 MB/s at 1280×720 and 30 fps. No raw image is published.
+- **the relay** (node `ffmpeg_to_compressed_video`) copies each packet's bytes into a `foxglove_msgs/CompressedVideo` on `/$NS/oak/rgb/image_raw/h264`, with no decode and no re-encode. The robot's airlock carries `CompressedVideo` but not yet `FFMPEGPacket`; the relay goes when it does.
 
 On the robot, Husarion UGV OS carries `/$NS/oak/rgb/image_raw/h264` to its camera node through an inbound H.264 lane, and the camera node passes the stream to the Cockpit as it is. That lane is part of the robot's own configuration (UGV OS), not of this project.
 
@@ -168,11 +168,11 @@ Start the stack with the OAK:
 ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile oak up -d
 ```
 
-What the `oak` service sets, and why:
+What the launch file sets, and why (`namespace`, `ip` and `bitrate` come from the compose file; the rest is fixed in the launch file, `depthai-docker` `launch/oak_h264.launch.py`):
 
 | Setting | Why |
 | -- | -- |
-| `camera_node`, not `camera.launch.py` | The launch file also publishes the camera's own description and transforms; the robot's URDF already places the OAK (`CAM12`) |
+| depthai's `Camera` component, not its `camera.launch.py` | That launch file also publishes the camera's own description and transforms; the robot's URDF already places the OAK (`CAM12`) |
 | `camera.i_ip:=$OAK_IP` (default `10.15.20.6`) | The PoE camera's address |
 | `camera.i_pipeline_type:=RGB`, `camera.i_nn_type:=none`, IMU and IR off | The colour camera only: no depth, no network on the chip, no IR projector |
 | `rgb.i_low_bandwidth:=true`, `rgb.i_publish_compressed:=true` | The chip encodes, and the driver publishes the encoded stream instead of raw frames |
@@ -183,5 +183,5 @@ What the `oak` service sets, and why:
 Check that the stream arrives at 30 Hz on the user computer:
 
 ```bash
-docker compose -f compose.mapnav.yaml exec oak_relay bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/h264"
+docker compose -f compose.mapnav.yaml exec oak bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/h264"
 ```

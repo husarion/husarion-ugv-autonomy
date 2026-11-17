@@ -95,7 +95,7 @@ mapnav-up:
 mapnav-oak-up:
     docker compose -f compose.mapnav.yaml --profile oak up -d
 
-# Stop the map-nav stack (with the OAK's services, when they run)
+# Stop the map-nav stack (with the OAK's service, when it runs)
 mapnav-down:
     docker compose -f compose.mapnav.yaml --profile oak down
 
