@@ -39,7 +39,7 @@ services:
         viz:=false
 
   navigation:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c78444b@sha256:e449f7b424c62b566f122a8f6a2f19925e2e53167e3bd3327ae537d817691b7b
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c249ca7@sha256:4746f17ed04ba0a0e0b6fd0b8a6956a0aa6d68f850e4b342b7c2e52ac384688a
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
@@ -67,14 +67,13 @@ services:
   # through one inbound lane to the robot's camera node. No raw image leaves this computer, and
   # the OAK stays out of navigation.
   oak:
-    # PIN: replace the tag with `jazzy-map-nav@sha256:<digest>` once CI has built depthai-docker
-    # map-nav (both architectures).
-    image: husarion/depthai:jazzy-map-nav
+    # depthai-docker map-nav 669ee7e (stock depthai-ros 2.13.0 from apt), amd64 + arm64.
+    image: husarion/depthai:jazzy-map-nav@sha256:94d3187841aa6b66d65ca0fcc32152d0990887c670d865c8711d5c33a0a04a27
     profiles: [oak]
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
-    # The robot's URDF places the OAK (components.yaml, CAM11), so no description or transform is
+    # The robot's URDF places the OAK (components.yaml, CAM12), so no description or transform is
     # published here: camera_node runs alone, not camera.launch.py. RGB only, encoded on the
     # chip as H.264 baseline (profile 0, no B-frames), published as FFMPEGPacket on
     # oak/rgb/image_raw/compressed. A keyframe every 30 frames: one a second at 30 fps.
@@ -101,10 +100,8 @@ services:
   # bytes unchanged. The airlock image cannot carry FFMPEGPacket yet; when it can (airlock
   # 1.30.0), remove this service and let the lane carry oak/rgb/image_raw/compressed.
   oak_relay:
-    # PIN: the relay is in the autonomy image from husarion_ugv_autonomy_ros map-nav c249ca7 on.
-    # Replace with `jazzy-map-nav-<sha7>@sha256:<digest>` from that build (the same image as
-    # `navigation` once it is repinned).
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav
+    # The relay is in the autonomy image (husarion_ugv_video_relay), the same image as `navigation`.
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c249ca7@sha256:4746f17ed04ba0a0e0b6fd0b8a6956a0aa6d68f850e4b342b7c2e52ac384688a
     profiles: [oak]
     <<: *common-config
     volumes:

@@ -153,10 +153,10 @@ If the `husarion-depthai` snap is installed on the user computer, stop it first.
 sudo snap stop --disable husarion-depthai
 ```
 
-Describe the OAK in `components.yaml` as well (Manage › Robot › Driver files), so its frames are on the robot's TF tree like the LiDAR's. `CAM11` is the OAK-D Pro; measure `xyz` and `rpy` on your robot, these values are only an example:
+Describe the OAK in `components.yaml` as well (Manage › Robot › Driver files), so its frames are on the robot's TF tree like the LiDAR's. `CAM12` is the OAK-D Pro PoE (`CAM11` is the USB OAK-D Pro); measure `xyz` and `rpy` on your robot, these values are only an example:
 
 ```yaml
-  - type: CAM11            # Luxonis OAK-D Pro
+  - type: CAM12            # Luxonis OAK-D Pro PoE
     parent_link: mount_link
     xyz: 0.20 0.0 0.10     # yours
     rpy: 0.0 0.0 0.0
@@ -172,7 +172,7 @@ What the `oak` service sets, and why:
 
 | Setting | Why |
 | -- | -- |
-| `camera_node`, not `camera.launch.py` | The launch file also publishes the camera's own description and transforms; the robot's URDF already places the OAK (`CAM11`) |
+| `camera_node`, not `camera.launch.py` | The launch file also publishes the camera's own description and transforms; the robot's URDF already places the OAK (`CAM12`) |
 | `camera.i_ip:=$OAK_IP` (default `10.15.20.6`) | The PoE camera's address |
 | `camera.i_pipeline_type:=RGB`, `camera.i_nn_type:=none`, IMU and IR off | The colour camera only: no depth, no network on the chip, no IR projector |
 | `rgb.i_low_bandwidth:=true`, `rgb.i_publish_compressed:=true` | The chip encodes, and the driver publishes the encoded stream instead of raw frames |
