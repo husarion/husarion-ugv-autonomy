@@ -68,9 +68,8 @@ services:
   # the OAK stays out of navigation. The relay is in the depthai image: when the airlock carries
   # FFMPEGPacket (airlock 1.30.0), it goes from that image's launch file.
   oak:
-    # PIN: repin after depthai-docker map-nav 93d2782 is built. This digest (669ee7e) has no relay
-    # and no launch/oak_h264.launch.py, so `--profile oak` fails to start until it is repinned.
-    image: husarion/depthai:jazzy-map-nav@sha256:94d3187841aa6b66d65ca0fcc32152d0990887c670d865c8711d5c33a0a04a27
+    # depthai-docker map-nav 93d2782: stock depthai-ros 2.13.0 plus the relay, amd64 + arm64.
+    image: husarion/depthai:jazzy-map-nav@sha256:e0824df77b0a223d8ad37766be3e5d29b46e7dc18a9c6bbce5b34f4d774da623
     profiles: [oak]
     <<: *common-config
     volumes:
