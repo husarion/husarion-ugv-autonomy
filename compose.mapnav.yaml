@@ -39,7 +39,7 @@ services:
         viz:=false
 
   navigation:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c249ca7@sha256:4746f17ed04ba0a0e0b6fd0b8a6956a0aa6d68f850e4b342b7c2e52ac384688a
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
