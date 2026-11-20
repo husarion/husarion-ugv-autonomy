@@ -8,8 +8,8 @@
 # and the Nav2 stack fed by it (demo-mapnav.md):
 # - `ouster`: the 3D cloud; the stack crops the robot's body out of it and slices it into the 2D
 #   scan for SLAM and AMCL, and the costmaps and the collision monitor use the cloud.
-# - `rplidar`: an RPLIDAR's 2D scan (RPLIDAR_MODEL a3 or s3) goes straight to SLAM, AMCL, the
-#   costmaps and the collision monitor, with no crop box and no slice, at 0.3 m/s at most.
+# - `rplidar`: an RPLIDAR's 2D scan (RPLIDAR_MODEL a3 or s3), turned into a cloud, takes the same
+#   crop box and slice as the Ouster's, at 0.3 m/s at most.
 # The OAK's video for the Cockpit is one more service behind the `oak` profile, off unless
 # `--profile oak` is given (demo-mapnav.md §7).
 # Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
@@ -73,10 +73,11 @@ services:
         use_sim_time:=False
 
   # A Slamtec RPLIDAR (demo-mapnav.md §8) on the user computer's USB port: RPLIDAR_MODEL a3 (the
-  # A3, the default) or s3 (the S3, not tested on a sensor yet). The model sets the serial rate and the scan mode
-  # of sllidar_ros2's own launch file for it; a model not listed stops the service at start. The
-  # robot's URDF places the sensor (components.yaml: LDR06 for the S3, LDR04 for the A3), so the
-  # driver publishes no transform and stamps the scan in the URDF's frame. The scan is /<ns>/scan.
+  # A3, the default) or s3 (the S3, not tested on a sensor yet). The model sets the serial rate and
+  # the scan mode of sllidar_ros2's own launch file for it; a model not listed stops the service at
+  # start. The robot's URDF places the sensor (components.yaml: LDR04 for the A3, LDR06 for the S3),
+  # so the driver publishes no transform and stamps the scan in the URDF's frame. Its raw scan is
+  # /<ns>/rplidar/scan: /<ns>/scan is the stack's, after the robot is cropped out (below).
   rplidar:
     # rplidar-docker jazzy 1.0.1 (sllidar_ros2), amd64 + arm64.
     image: husarion/rplidar:jazzy-1.0.1-20260522@sha256:15afa7295060e31e68c49ac45a0fbaad85d87e73e9dd27c1690ab5a46bff3d4e
@@ -99,19 +100,37 @@ services:
         esac
         echo "RPLIDAR $$RPLIDAR_MODEL: $$baud baud, scan mode $$mode"
         exec ros2 launch /husarion_utils/rplidar.launch.yaml \
-          namespace:=${ROBOT_NAMESPACE:-panther} \
+          namespace:=${ROBOT_NAMESPACE:-panther}/rplidar \
           serial_port:=/dev/ttyUSB0 \
           serial_baudrate:=$$baud \
           scan_mode:=$$mode \
           frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
 
-  # Nav2 on the RPLIDAR's scan (either model): observation_topic_type laserscan, so the stack runs no crop box and
-  # no slice, and SLAM, AMCL, the costmaps and the collision monitor all read /<ns>/scan.
-  # A 2D LiDAR sees one plane only, so linear speed is capped at 0.3 m/s at all times, as for the
-  # OS2-64: lidar_profile os2_64 carries that cap. On a scan its other settings (the slice, the
-  # crop box, the cloud's frustum) have nothing to act on; the stack also reads the rail height
-  # from TF at start. RPLIDAR_SPEED_CAP=os0_32 (a profile with no cap) removes it knowingly; empty
-  # or unset keeps it (demo-mapnav.md §8). ros2 launch refuses an empty lidar_profile:=.
+  # The RPLIDAR's scan as a point cloud (/<ns>/rplidar/points, in the scan's own frame), so the 2D
+  # path runs through the same crop box and slice as the Ouster's cloud: the crop box drops the
+  # robot itself (the DEV09's posts stand in the scan plane, inside the footprint), and the slice
+  # makes /<ns>/scan for SLAM and AMCL.
+  rplidar_cloud:
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    profiles: [rplidar]
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+    command: >
+      ros2 run pointcloud_to_laserscan laserscan_to_pointcloud_node
+        --ros-args
+        -r __ns:=/${ROBOT_NAMESPACE:-panther}
+        -r scan_in:=rplidar/scan
+        -r cloud:=rplidar/points
+
+  # Nav2 on the RPLIDAR's cloud (either model), the Ouster's path: the crop box drops everything
+  # inside the footprint up to ROBOT_HEIGHT, the slice (0.05 m to 2.0 m, so the scan plane is in it
+  # wherever the sensor is mounted) feeds SLAM and AMCL, and the costmaps and the collision monitor
+  # read the cropped cloud. A 2D LiDAR sees one plane only, so linear speed is capped at 0.3 m/s at
+  # all times, as for the OS2-64: lidar_profile os2_64 carries that cap (and its 0.8 m minimum range
+  # for the slice). RPLIDAR_SPEED_CAP=os0_32 (no cap, 0.5 m) removes it knowingly; empty or unset
+  # keeps it (demo-mapnav.md §8). ros2 launch refuses an empty lidar_profile:=. The stack reads
+  # the rail height from TF at start.
   navigation_rplidar:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
     profiles: [rplidar]
@@ -123,9 +142,12 @@ services:
       ros2 launch husarion_ugv_navigation bringup_launch.py
         namespace:=${ROBOT_NAMESPACE:-panther}
         robot_model:=${ROBOT_MODEL:-panther}
-        observation_topic:=/${ROBOT_NAMESPACE:-panther}/scan
-        observation_topic_type:=laserscan
+        observation_topic:=/${ROBOT_NAMESPACE:-panther}/rplidar/points
+        observation_topic_type:=pointcloud
         lidar_profile:=${RPLIDAR_SPEED_CAP:-os2_64}
+        robot_height:=${ROBOT_HEIGHT:-0.7}
+        scan_min_height:=0.05
+        scan_max_height:=2.0
         use_collision_monitor:=True
         cmd_vel_out:=autonomous/cmd_vel
         slam:=${SLAM:-True}
