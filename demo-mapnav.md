@@ -226,7 +226,7 @@ components:
   - type: LDR06            # Slamtec RPLIDAR S3
     parent_link: mount_link
     xyz: 0.22 0.0 0.0      # yours: the centre of the sensor's base on the rail
-    rpy: 0.0 0.0 0.0       # cable to the rear
+    rpy: 0.0 0.0 0.0       # yours: check it with the wall test below
 ```
 
 `xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 30.5 mm above the base and turns `laser` 180° to match the driver's angles. If the sensor is turned on its mount, put the turn in `rpy`.
