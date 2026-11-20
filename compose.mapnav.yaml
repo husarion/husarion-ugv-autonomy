@@ -93,8 +93,11 @@ services:
         frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
 
   # Nav2 on the RPLIDAR's scan: observation_topic_type laserscan, so the stack runs no crop box and
-  # no slice, and SLAM, AMCL, the costmaps and the collision monitor all read /<ns>/scan. No
-  # lidar_profile: no speed cap, and no rail height read from TF.
+  # no slice, and SLAM, AMCL, the costmaps and the collision monitor all read /<ns>/scan.
+  # The S3 sees one plane only, so linear speed is capped at 0.3 m/s at all times, as for the
+  # OS2-64: lidar_profile os2_64 carries that cap. On a scan its other settings (the slice, the
+  # crop box, the cloud's frustum) have nothing to act on; the stack also reads the rail height
+  # from TF at start. RPLIDAR_SPEED_CAP= (empty) removes the cap (demo-mapnav.md §8).
   navigation_rplidar:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
     profiles: [rplidar]
@@ -108,6 +111,7 @@ services:
         robot_model:=${ROBOT_MODEL:-panther}
         observation_topic:=/${ROBOT_NAMESPACE:-panther}/scan
         observation_topic_type:=laserscan
+        lidar_profile:=${RPLIDAR_SPEED_CAP-os2_64}
         use_collision_monitor:=True
         cmd_vel_out:=autonomous/cmd_vel
         slam:=${SLAM:-True}

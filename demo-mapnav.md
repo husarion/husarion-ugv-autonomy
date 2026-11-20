@@ -105,7 +105,7 @@ The settings, each with its default:
 | `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
 | `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
-| `RPLIDAR_DEVICE`, `RPLIDAR_FRAME` | `/dev/ttyUSB0`, `laser` | With `--profile rplidar` (§8) instead of `--profile ouster`: the S3's serial port, and its frame below the namespace |
+| `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the S3's serial port, its frame below the namespace, and its 0.3 m/s speed cap (empty: none) |
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
@@ -202,7 +202,17 @@ docker compose -f compose.mapnav.yaml --profile rplidar logs -f
 
 Everything else is as above: the clock (§1), the e-stop, `SLAM`, `MAP_NAME` and a saved map (§5), the OAK (`--profile oak`, §7), stopping (§6). `LIDAR_PROFILE`, `ROBOT_HEIGHT`, `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` and `OBSERVATION_TOPIC` belong to the Ouster and do nothing here.
 
-**What differs from the Ouster.** The S3 measures one horizontal plane, so the stack takes its scan as it is: no crop box and no slice. slam_toolbox, AMCL, both costmaps and the collision monitor (the same stop and slowdown polygons) all read `/$NS/scan`. There is no speed cap, and the stack reads no rail height from TF at start.
+**What differs from the Ouster.** The S3 measures one horizontal plane, so the stack takes its scan as it is: no crop box and no slice. slam_toolbox, AMCL, both costmaps and the collision monitor (the same stop and slowdown polygons) all read `/$NS/scan`. As with the Ouster, the stack reads the rail height (`$NS/mount_link`) from the robot's TF at start.
+
+**Linear speed is capped at 0.3 m/s, at all times**, in the controller and the velocity smoother, the same cap as the OS2-64 (§4), because the S3 cannot see what is below or above its plane. The compose file does it with `lidar_profile:=os2_64` (`RPLIDAR_SPEED_CAP`, default `os2_64`); on a 2D scan only the cap of that profile acts. To drive at the stack's own speed (0.8 m/s) once you have judged your site, remove the cap knowingly:
+
+```bash
+RPLIDAR_SPEED_CAP= ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile rplidar up -d
+```
+
+`RPLIDAR_SPEED_CAP` set but empty means no cap; there is no value in between with this image.
+
+**Clearing in the costmaps.** With the image pinned here, the costmaps clear what the S3 no longer sees only in a 60° cone in front of the sensor (a depth camera's frustum); elsewhere an obstacle that has gone stays marked until it decays, within a second. The next autonomy image clears over the whole circle (husarion_ugv_autonomy_ros, `nav2_params.yaml`, the `laserscan` source); it takes effect when this file pins that image.
 
 > **The S3 sees only its own plane.** Anything lower than the sensor (a kerb, a box, a person's feet) or higher (a table top, a barrier arm) is not seen, by the costmaps or by the collision monitor. Use it where obstacles reach the height of the scan plane, and watch the robot while it drives.
 
