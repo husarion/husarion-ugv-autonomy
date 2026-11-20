@@ -238,19 +238,24 @@ If the `husarion-rplidar` snap is installed on the user computer, stop it first;
 sudo snap stop --disable husarion-rplidar
 ```
 
-**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2: `LDR04` for the A3, `LDR06` for the S3 (the names `rplidar_a3` and `rplidar_s3` also work with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. For a Panther with the sensor centred on the front crossbar of the rails:
+**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2: `LDR04` for the A3, `LDR06` for the S3 (the names `rplidar_a3` and `rplidar_s3` also work with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. The demo's place for the LiDAR is the front crossbar of the rails, centred, the same place as the Ouster in §2:
 
 ```yaml
 components:
   - type: LDR04            # Slamtec RPLIDAR A3; LDR06 for an S3
     parent_link: mount_link
-    xyz: 0.22 0.0 0.0      # yours: the centre of the sensor's base on the rail
-    rpy: 0.0 0.0 0.0       # yours: check it with the wall test below
+    xyz: 0.22 0.0 0.0      # the front crossbar, centred: the Ouster's place (LDR10/LDR17 at 0.22 0 0, §2)
+    rpy: 0.0 0.0 0.0       # cable to the rear; 0.0 0.0 3.14159 with the cable to the front
 ```
 
-`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 31 mm (A3) or 30.5 mm (S3) above the base and turns `laser` 180° to match the driver's angles. If the sensor is turned on its mount, put the turn in `rpy`.
+`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 31 mm (A3) or 30.5 mm (S3) above the base, so 3 cm above the rail. **With `rpy: 0 0 0` the sensor's cable (its interface lead) points to the rear of the robot**: the model turns `laser` 180° from the sensor's base, and Slamtec's ROS frame has its x axis towards the cable. Mounted the other way round, with the cable to the front, set `rpy: 0.0 0.0 3.14159`. The S3's cable is taken to follow the same rule; the wall check below confirms either.
 
-> **Keep the robot out of the scan plane.** With no crop box, every part of the robot the LiDAR sees (a gate post, an antenna, a mast) is an obstacle. Inside the footprint plus 15 cm the collision monitor's stop polygon then holds the robot still, and Nav2 will not move it. Mount the sensor above everything else on the robot, or where nothing of the robot is level with it.
+> **A DEV09 gate and an RPLIDAR on the rail do not go together.** The DEV09's four posts stand on the rail from 0.08 m to 0.12 m in front of and behind the rail's centre, 0.23 m to 0.26 m to each side, and rise 0.25 m (the gate's model in husarion_components_description). A scan plane 3 cm above the rail cuts all four, about 0.27 m from a sensor at the front crossbar, inside the robot's footprint. With no crop box in the 2D path, the collision monitor counts them as an obstacle inside its stop polygon and **holds the robot still for good: Nav2 accepts a goal and the robot never moves** (this is what the simulation showed with a post of the robot's own in the scan plane). Choose one:
+> - **No DEV09 on the robot** when the LiDAR is an RPLIDAR on the rail.
+> - **Raise the LiDAR above the gate**: on a plate or riser on top of the DEV09, so the scan plane is above its top bar (0.25 m above the rail) and above anything else mounted on the robot. In `components.yaml` give it the riser's height in `xyz`, e.g. `xyz: 0.0 0.0 0.27` with the base 0.27 m above the rail; the antennas and cameras must then be below the plane too.
+> - **A laser filter** that removes the posts' angles from the scan before Nav2 reads it (for example `laser_filters`' angular or box filter). This project does not ship one; it would be one more service between `scan` and the stack, and it also blinds the LiDAR in those directions.
+
+> **Keep the robot out of the scan plane** for the same reason, whatever else is mounted: a mast, an antenna or a camera bracket level with the sensor stops the robot the same way.
 
 Check: the scan arrives (about 8 Hz from the A3 measured here, about 10 Hz from the S3), and in the Cockpit's 3D view the wall the robot faces is in front of it, not behind it.
 
