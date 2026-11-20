@@ -1,6 +1,6 @@
 # Map-nav demo: Nav2 behind the airlock of Husarion UGV OS
 
-This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user computer of a Panther or Lynx with Husarion UGV OS. It uses an Ouster 3D LiDAR, or a Slamtec RPLIDAR S3 2D LiDAR (§8, not tested on a robot yet), whose driver runs in the same compose file. On UGV OS the robot's built-in computer runs the airlock, which carries exactly one drive input from the user computer: `/<namespace>/autonomous/cmd_vel`. The stack in `compose.mapnav.yaml` is built for that:
+This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user computer of a Panther or Lynx with Husarion UGV OS. It uses an Ouster 3D LiDAR, or a Slamtec RPLIDAR S3 or A3 2D LiDAR (§8, not yet driven on a robot), whose driver runs in the same compose file. On UGV OS the robot's built-in computer runs the airlock, which carries exactly one drive input from the user computer: `/<namespace>/autonomous/cmd_vel`. The stack in `compose.mapnav.yaml` is built for that:
 
 - **The namespace is your robot's.** UGV OS names a robot `{model}_{serial}`, for example `panther_0957`. Every topic, action and frame of the stack follows it: `/<ns>/navigate_to_pose`, `<ns>/map`, `<ns>/base_link`.
 - **Nav2's output** is a stamped twist on `/<ns>/autonomous/cmd_vel`.
@@ -8,7 +8,7 @@ This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user comp
 - **Recoveries pass the same chain.** Spin and back-up go through the smoother and the collision monitor too.
 - **The 3D cloud also feeds the costmaps.** A 2D slice of it, 0.25 m to 1.0 m above the ground, feeds slam_toolbox and AMCL.
 
-- **One LiDAR, chosen by a Compose profile.** `--profile ouster` runs the Ouster's driver and the stack on its cloud (§2 to §6); `--profile rplidar` runs the RPLIDAR S3's driver and the stack on its 2D scan (§8). Give exactly one. With neither, nothing starts.
+- **One LiDAR, chosen by a Compose profile.** `--profile ouster` runs the Ouster's driver and the stack on its cloud (§2 to §6); `--profile rplidar` runs an RPLIDAR's driver (`RPLIDAR_MODEL` `s3` or `a3`) and the stack on its 2D scan (§8). Give exactly one. With neither, nothing starts.
 
 - **The OAK's video, if you ask for it** (§7): the OAK encodes H.264 on its own chip, and the airlock carries that stream to the robot's Cockpit. No raw image leaves the user computer, and the OAK stays out of navigation.
 
@@ -105,7 +105,7 @@ The settings, each with its default:
 | `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
 | `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
-| `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the S3's serial port, its frame below the namespace, and its 0.3 m/s speed cap (`os0_32`: none) |
+| `RPLIDAR_MODEL`, `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `a3`, `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the model (`a3` or `s3`), its serial port, its frame below the namespace, and its 0.3 m/s speed cap (`os0_32`: none) |
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
@@ -189,39 +189,48 @@ Check that the stream arrives at 30 Hz on the user computer:
 docker compose -f compose.mapnav.yaml exec oak bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/h264"
 ```
 
-## 8. A Slamtec RPLIDAR S3 instead of the Ouster
+## 8. A Slamtec RPLIDAR (S3 or A3) instead of the Ouster
 
-> **Not tested on a robot yet.** This path has run only against a simulated S3 (a fake robot replaying the driver's scan geometry). Watch the robot closely the first time it drives on it, with the e-stop in reach.
+> **What has been tested.** The **A3**: its driver on a real A3 (on a user computer, 8.2 scans a second, 1800 points, scan mode `Sensitivity`) and the whole stack on that real scan with the robot standing still; not yet driving a robot. The **S3**: only against a simulated S3 (a fake robot replaying the driver's scan geometry), not on a sensor or a robot. Watch the robot closely the first time it drives on either, with the e-stop in reach.
 
-The `rplidar` profile replaces the `ouster` profile: it runs the S3's driver (`rplidar`, from `husarion/rplidar`, sllidar_ros2) and Nav2 on its 2D scan (`navigation_rplidar`). Use it instead of `--profile ouster`, never with it:
+The `rplidar` profile replaces the `ouster` profile: it runs the RPLIDAR's driver (`rplidar`, from `husarion/rplidar`, sllidar_ros2) and Nav2 on its 2D scan (`navigation_rplidar`). Use it instead of `--profile ouster`, never with it. `RPLIDAR_MODEL` names the sensor:
 
 ```bash
-ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile rplidar up -d
+ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile rplidar up -d
 docker compose -f compose.mapnav.yaml --profile rplidar logs -f
 ```
 
+| `RPLIDAR_MODEL` | Sensor | Serial rate | Scan mode | `components.yaml` type |
+| -- | -- | -- | -- | -- |
+| `s3` | RPLIDAR S3 | 1,000,000 baud | `DenseBoost` | `LDR06` (`rplidar_s3`) |
+| `a3` (default) | RPLIDAR A3 | 256,000 baud | `Sensitivity` | `LDR04` (`rplidar_a3`) |
+
+The rate and the mode are those of sllidar_ros2's own launch file for each model. Any other value stops the driver at start with a message naming the two.
+
 Everything else is as above: the clock (§1), the e-stop, `SLAM`, `MAP_NAME` and a saved map (§5), the OAK (`--profile oak`, §7), stopping (§6). `LIDAR_PROFILE`, `ROBOT_HEIGHT`, `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` and `OBSERVATION_TOPIC` belong to the Ouster and do nothing here.
 
-**What differs from the Ouster.** The S3 measures one horizontal plane, so the stack takes its scan as it is: no crop box and no slice. slam_toolbox, AMCL, both costmaps and the collision monitor (the same stop and slowdown polygons) all read `/$NS/scan`. As with the Ouster, the stack reads the rail height (`$NS/mount_link`) from the robot's TF at start.
+**What differs from the Ouster.** An RPLIDAR measures one horizontal plane, so the stack takes its scan as it is: no crop box and no slice. slam_toolbox, AMCL, both costmaps and the collision monitor (the same stop and slowdown polygons) all read `/$NS/scan`. As with the Ouster, the stack reads the rail height (`$NS/mount_link`) from the robot's TF at start.
 
-**Linear speed is capped at 0.3 m/s, at all times**, in the controller and the velocity smoother, the same cap as the OS2-64 (§4), because the S3 cannot see what is below or above its plane. The compose file does it with the launch argument `lidar_profile:=os2_64` (`RPLIDAR_SPEED_CAP`, default `os2_64`); on a 2D scan only the cap of that profile acts. To drive at the stack's own speed (0.8 m/s) once you have judged your site, remove the cap knowingly by choosing `os0_32`, the profile with no cap:
+**Linear speed is capped at 0.3 m/s, at all times**, for either model, in the controller and the velocity smoother, the same cap as the OS2-64 (§4), because a 2D LiDAR cannot see what is below or above its plane. The compose file does it with the launch argument `lidar_profile:=os2_64` (`RPLIDAR_SPEED_CAP`, default `os2_64`); on a 2D scan only the cap of that profile acts. To drive at the stack's own speed (0.8 m/s) once you have judged your site, remove the cap knowingly by choosing `os0_32`, the profile with no cap:
 
 ```bash
-RPLIDAR_SPEED_CAP=os0_32 ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile rplidar up -d
+RPLIDAR_SPEED_CAP=os0_32 ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile rplidar up -d
 ```
 
 Empty or unset keeps the cap, and any other value stops the stack at start. There is no speed in between with this image.
 
-**Clearing in the costmaps.** With the image pinned here, the costmaps clear what the S3 no longer sees only in a 60° cone in front of the sensor (a depth camera's frustum); elsewhere an obstacle that has gone stays marked until it decays, within a second. The next autonomy image clears over the whole circle (husarion_ugv_autonomy_ros, `nav2_params.yaml`, the `laserscan` source); it takes effect when this file pins that image.
+**Clearing in the costmaps.** With the image pinned here, the costmaps clear what the LiDAR no longer sees only in a 60° cone in front of the sensor (a depth camera's frustum); elsewhere an obstacle that has gone stays marked until it decays, within a second. The next autonomy image clears over the whole circle (husarion_ugv_autonomy_ros, `nav2_params.yaml`, the `laserscan` source); it takes effect when this file pins that image.
 
-> **The S3 sees only its own plane.** Anything lower than the sensor (a kerb, a box, a person's feet) or higher (a table top, a barrier arm) is not seen, by the costmaps or by the collision monitor. Use it where obstacles reach the height of the scan plane, and watch the robot while it drives.
+> **An RPLIDAR sees only its own plane.** Anything lower than the sensor (a kerb, a box, a person's feet) or higher (a table top, a barrier arm) is not seen, by the costmaps or by the collision monitor. Use it where obstacles reach the height of the scan plane, and watch the robot while it drives.
 
-**Connect it** to a USB port of the user computer. The driver opens `RPLIDAR_DEVICE` (default `/dev/ttyUSB0`) at 1,000,000 baud, the S3's rate, in its `DenseBoost` mode. A name that does not change between boots is safer:
+**Connect it** to a USB port of the user computer. The driver opens `RPLIDAR_DEVICE` (default `/dev/ttyUSB0`). Use the name under `/dev/serial/by-id/`, which does not change between boots or when other USB serial devices come and go:
 
 ```bash
-ls /dev/serial/by-id/        # e.g. usb-Silicon_Labs_CP2102N_..._0001-if00-port0
-export RPLIDAR_DEVICE=/dev/serial/by-id/usb-Silicon_Labs_CP2102N_..._0001-if00-port0
+ls /dev/serial/by-id/        # e.g. usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_..._-if00-port0
+export RPLIDAR_DEVICE=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_..._-if00-port0
 ```
+
+The compose file passes that one device into the container; nothing else of the host's `/dev` is visible to it.
 
 If the `husarion-rplidar` snap is installed on the user computer, stop it first; two drivers cannot share the port:
 
@@ -229,27 +238,27 @@ If the `husarion-rplidar` snap is installed on the user computer, stop it first;
 sudo snap stop --disable husarion-rplidar
 ```
 
-**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2. `LDR06` is the RPLIDAR S3 (`rplidar_s3` also works with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. For a Panther with the S3 centred on the front crossbar of the rails:
+**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2: `LDR04` for the A3, `LDR06` for the S3 (the names `rplidar_a3` and `rplidar_s3` also work with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. For a Panther with the sensor centred on the front crossbar of the rails:
 
 ```yaml
 components:
-  - type: LDR06            # Slamtec RPLIDAR S3
+  - type: LDR04            # Slamtec RPLIDAR A3; LDR06 for an S3
     parent_link: mount_link
     xyz: 0.22 0.0 0.0      # yours: the centre of the sensor's base on the rail
     rpy: 0.0 0.0 0.0       # yours: check it with the wall test below
 ```
 
-`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 30.5 mm above the base and turns `laser` 180° to match the driver's angles. If the sensor is turned on its mount, put the turn in `rpy`.
+`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 31 mm (A3) or 30.5 mm (S3) above the base and turns `laser` 180° to match the driver's angles. If the sensor is turned on its mount, put the turn in `rpy`.
 
-> **Keep the robot out of the scan plane.** With no crop box, every part of the robot the S3 sees (a gate post, an antenna, a mast) is an obstacle. Inside the footprint plus 15 cm the collision monitor's stop polygon then holds the robot still, and Nav2 will not move it. Mount the S3 above everything else on the robot, or where nothing of the robot is level with it.
+> **Keep the robot out of the scan plane.** With no crop box, every part of the robot the LiDAR sees (a gate post, an antenna, a mast) is an obstacle. Inside the footprint plus 15 cm the collision monitor's stop polygon then holds the robot still, and Nav2 will not move it. Mount the sensor above everything else on the robot, or where nothing of the robot is level with it.
 
-Check: the scan arrives at about 10 Hz, and in the Cockpit's 3D view the wall the robot faces is in front of it, not behind it.
+Check: the scan arrives (about 8 Hz from the A3 measured here, about 10 Hz from the S3), and in the Cockpit's 3D view the wall the robot faces is in front of it, not behind it.
 
 ```bash
 docker compose -f compose.mapnav.yaml exec rplidar bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/scan"
 ```
 
-**In the Cockpit's installer** (when it ships) the choice is a knob of the project, not two commands: the LiDAR is `ouster` (profile `ouster`, with the Ouster model as a second field) or `rplidar_s3` (profile `rplidar`), and the installer passes the matching `--profile`. Until the manifest schema is published, the draft is:
+**In the Cockpit's installer** (when it ships) the choice is a knob of the project, not commands: the LiDAR is `ouster` (profile `ouster`, with the Ouster model as a second field) or `rplidar` (profile `rplidar`, with the RPLIDAR model as a second field), and the installer passes the matching `--profile`. Until the manifest schema is published, the draft is:
 
 ```yaml
 - key: LIDAR
@@ -258,5 +267,13 @@ docker compose -f compose.mapnav.yaml exec rplidar bash -c "source /opt/ros/jazz
   default: ouster
   options:
     - {value: ouster, label: Ouster, compose_profiles: [ouster]}
-    - {value: rplidar_s3, label: RPLIDAR S3, compose_profiles: [rplidar]}
+    - {value: rplidar, label: Slamtec RPLIDAR, compose_profiles: [rplidar]}
+- key: RPLIDAR_MODEL
+  label: RPLIDAR model
+  type: choice
+  default: a3
+  when: {LIDAR: rplidar}
+  options:
+    - {value: a3, label: RPLIDAR A3}
+    - {value: s3, label: RPLIDAR S3}
 ```

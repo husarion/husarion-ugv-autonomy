@@ -95,7 +95,7 @@ mapnav-up:
 mapnav-oak-up:
     docker compose -f compose.mapnav.yaml --profile ouster --profile oak up -d
 
-# Start the map-nav stack with a Slamtec RPLIDAR S3 instead of the Ouster (demo-mapnav.md §8; not tested on a robot yet)
+# Start the map-nav stack with a Slamtec RPLIDAR instead of the Ouster: RPLIDAR_MODEL a3 (default) or s3 (demo-mapnav.md §8)
 mapnav-rplidar-up:
     docker compose -f compose.mapnav.yaml --profile rplidar up -d
 

@@ -2,14 +2,14 @@
 # running Husarion UGV OS, behind the robot's airlock. See demo-mapnav.md.
 #
 #   docker compose -f compose.mapnav.yaml --profile ouster up -d     # an Ouster 3D LiDAR
-#   docker compose -f compose.mapnav.yaml --profile rplidar up -d    # a Slamtec RPLIDAR S3
+#   docker compose -f compose.mapnav.yaml --profile rplidar up -d    # a Slamtec RPLIDAR S3 or A3
 #
 # Choose exactly one LiDAR profile; with none, nothing starts. Each profile runs its LiDAR's driver
 # and the Nav2 stack fed by it (demo-mapnav.md):
 # - `ouster`: the 3D cloud; the stack crops the robot's body out of it and slices it into the 2D
 #   scan for SLAM and AMCL, and the costmaps and the collision monitor use the cloud.
-# - `rplidar`: the S3's 2D scan goes straight to SLAM, AMCL, the costmaps and the collision
-#   monitor, with no crop box and no slice. Not tested on a robot yet.
+# - `rplidar`: an RPLIDAR's 2D scan (RPLIDAR_MODEL a3 or s3) goes straight to SLAM, AMCL, the
+#   costmaps and the collision monitor, with no crop box and no slice, at 0.3 m/s at most.
 # The OAK's video for the Cockpit is one more service behind the `oak` profile, off unless
 # `--profile oak` is given (demo-mapnav.md §7).
 # Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
@@ -72,29 +72,42 @@ services:
         initial_pose_from_sidecar:=True
         use_sim_time:=False
 
-  # The Slamtec RPLIDAR S3 (demo-mapnav.md §8), on the user computer's USB port. Not tested on a
-  # robot yet. The robot's URDF places the sensor (components.yaml, LDR06), so the driver publishes
-  # no transform and stamps the scan in the URDF's frame. The scan is /<ns>/scan.
+  # A Slamtec RPLIDAR (demo-mapnav.md §8) on the user computer's USB port: RPLIDAR_MODEL a3 (the
+  # A3, the default) or s3 (the S3, not tested on a sensor yet). The model sets the serial rate and the scan mode
+  # of sllidar_ros2's own launch file for it; a model not listed stops the service at start. The
+  # robot's URDF places the sensor (components.yaml: LDR06 for the S3, LDR04 for the A3), so the
+  # driver publishes no transform and stamps the scan in the URDF's frame. The scan is /<ns>/scan.
   rplidar:
     # rplidar-docker jazzy 1.0.1 (sllidar_ros2), amd64 + arm64.
     image: husarion/rplidar:jazzy-1.0.1-20260522@sha256:15afa7295060e31e68c49ac45a0fbaad85d87e73e9dd27c1690ab5a46bff3d4e
     profiles: [rplidar]
     <<: *common-config
+    environment:
+      RPLIDAR_MODEL: ${RPLIDAR_MODEL:-a3}
     volumes:
       - ./config/mapnav:/config/mapnav:ro
     devices:
       - ${RPLIDAR_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
-    command: >
-      ros2 launch /husarion_utils/rplidar.launch.yaml
-        namespace:=${ROBOT_NAMESPACE:-panther}
-        serial_port:=/dev/ttyUSB0
-        serial_baudrate:=1000000
-        scan_mode:=DenseBoost
-        frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
+    command:
+      - bash
+      - -c
+      - |
+        case "$$RPLIDAR_MODEL" in
+          s3) baud=1000000; mode=DenseBoost ;;
+          a3) baud=256000; mode=Sensitivity ;;
+          *) echo "RPLIDAR_MODEL must be s3 or a3, not '$$RPLIDAR_MODEL'" >&2; exit 2 ;;
+        esac
+        echo "RPLIDAR $$RPLIDAR_MODEL: $$baud baud, scan mode $$mode"
+        exec ros2 launch /husarion_utils/rplidar.launch.yaml \
+          namespace:=${ROBOT_NAMESPACE:-panther} \
+          serial_port:=/dev/ttyUSB0 \
+          serial_baudrate:=$$baud \
+          scan_mode:=$$mode \
+          frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
 
-  # Nav2 on the RPLIDAR's scan: observation_topic_type laserscan, so the stack runs no crop box and
+  # Nav2 on the RPLIDAR's scan (either model): observation_topic_type laserscan, so the stack runs no crop box and
   # no slice, and SLAM, AMCL, the costmaps and the collision monitor all read /<ns>/scan.
-  # The S3 sees one plane only, so linear speed is capped at 0.3 m/s at all times, as for the
+  # A 2D LiDAR sees one plane only, so linear speed is capped at 0.3 m/s at all times, as for the
   # OS2-64: lidar_profile os2_64 carries that cap. On a scan its other settings (the slice, the
   # crop box, the cloud's frustum) have nothing to act on; the stack also reads the rail height
   # from TF at start. RPLIDAR_SPEED_CAP=os0_32 (a profile with no cap) removes it knowingly; empty
