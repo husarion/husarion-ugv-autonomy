@@ -87,18 +87,22 @@ undock:
 setup-os:
     bash setup_os.sh
 
-# Map-nav (demo-mapnav.md): Nav2 behind the airlock of Husarion UGV OS. Set ROBOT_NAMESPACE first.
+# Map-nav (demo-mapnav.md): Nav2 behind the airlock of Husarion UGV OS, with an Ouster. Set ROBOT_NAMESPACE first.
 mapnav-up:
-    docker compose -f compose.mapnav.yaml up -d
+    docker compose -f compose.mapnav.yaml --profile ouster up -d
 
-# Start the map-nav stack with the OAK's video for the Cockpit (demo-mapnav.md §7)
+# Start the map-nav stack with the Ouster and the OAK's video for the Cockpit (demo-mapnav.md §7)
 mapnav-oak-up:
-    docker compose -f compose.mapnav.yaml --profile oak up -d
+    docker compose -f compose.mapnav.yaml --profile ouster --profile oak up -d
 
-# Stop the map-nav stack (with the OAK's service, when it runs)
+# Start the map-nav stack with a Slamtec RPLIDAR S3 instead of the Ouster (demo-mapnav.md §8; not tested on a robot yet)
+mapnav-rplidar-up:
+    docker compose -f compose.mapnav.yaml --profile rplidar up -d
+
+# Stop the map-nav stack, whichever LiDAR and whether or not the OAK's service runs
 mapnav-down:
-    docker compose -f compose.mapnav.yaml --profile oak down
+    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak down
 
 # Follow the map-nav stack's logs
 mapnav-logs:
-    docker compose -f compose.mapnav.yaml logs -f
+    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak logs -f

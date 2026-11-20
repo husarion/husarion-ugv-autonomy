@@ -1,10 +1,17 @@
 # Map-nav: Nav2 with slam_toolbox (or AMCL on a saved map) on the user computer of a Husarion UGV
 # running Husarion UGV OS, behind the robot's airlock. See demo-mapnav.md.
 #
-#   docker compose -f compose.mapnav.yaml up -d
+#   docker compose -f compose.mapnav.yaml --profile ouster up -d     # an Ouster 3D LiDAR
+#   docker compose -f compose.mapnav.yaml --profile rplidar up -d    # a Slamtec RPLIDAR S3
 #
-# The Ouster LiDAR driver runs here too (demo-mapnav.md). The OAK's video for the Cockpit is one more
-# service behind the `oak` profile, off unless `--profile oak` is given (demo-mapnav.md §7).
+# Choose exactly one LiDAR profile; with none, nothing starts. Each profile runs its LiDAR's driver
+# and the Nav2 stack fed by it (demo-mapnav.md):
+# - `ouster`: the 3D cloud; the stack crops the robot's body out of it and slices it into the 2D
+#   scan for SLAM and AMCL, and the costmaps and the collision monitor use the cloud.
+# - `rplidar`: the S3's 2D scan goes straight to SLAM, AMCL, the costmaps and the collision
+#   monitor, with no crop box and no slice. Not tested on a robot yet.
+# The OAK's video for the Cockpit is one more service behind the `oak` profile, off unless
+# `--profile oak` is given (demo-mapnav.md §7).
 # Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
 # --env-file.
 
@@ -16,6 +23,7 @@ x-common-config: &common-config
 services:
   ouster:
     image: husarion/ouster:jazzy-map-nav@sha256:f1d681a3294cb2dd1564383380e34a3f352e9105feda0daaff52eb3ad1e7aa20
+    profiles: [ouster]
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
@@ -38,8 +46,10 @@ services:
         attempt_reconnect:=true
         viz:=false
 
+  # Nav2 on the Ouster's cloud (demo-mapnav.md §4).
   navigation:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    profiles: [ouster]
     <<: *common-config
     volumes:
       - ./config/mapnav:/config/mapnav:ro
@@ -54,6 +64,50 @@ services:
         robot_height:=${ROBOT_HEIGHT:-0.7}
         scan_min_height:=${SCAN_MIN_HEIGHT:-0.25}
         scan_max_height:=${SCAN_MAX_HEIGHT:-1.0}
+        use_collision_monitor:=True
+        cmd_vel_out:=autonomous/cmd_vel
+        slam:=${SLAM:-True}
+        map_update_interval:=5.0
+        map:=/maps/${MAP_NAME:-map}/map.yaml
+        initial_pose_from_sidecar:=True
+        use_sim_time:=False
+
+  # The Slamtec RPLIDAR S3 (demo-mapnav.md §8), on the user computer's USB port. Not tested on a
+  # robot yet. The robot's URDF places the sensor (components.yaml, LDR06), so the driver publishes
+  # no transform and stamps the scan in the URDF's frame. The scan is /<ns>/scan.
+  rplidar:
+    # rplidar-docker jazzy 1.0.1 (sllidar_ros2), amd64 + arm64.
+    image: husarion/rplidar:jazzy-1.0.1-20260522@sha256:15afa7295060e31e68c49ac45a0fbaad85d87e73e9dd27c1690ab5a46bff3d4e
+    profiles: [rplidar]
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+    devices:
+      - ${RPLIDAR_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+    command: >
+      ros2 launch /husarion_utils/rplidar.launch.yaml
+        namespace:=${ROBOT_NAMESPACE:-panther}
+        serial_port:=/dev/ttyUSB0
+        serial_baudrate:=1000000
+        scan_mode:=DenseBoost
+        frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
+
+  # Nav2 on the RPLIDAR's scan: observation_topic_type laserscan, so the stack runs no crop box and
+  # no slice, and SLAM, AMCL, the costmaps and the collision monitor all read /<ns>/scan. No
+  # lidar_profile: no speed cap, and no rail height read from TF.
+  navigation_rplidar:
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    profiles: [rplidar]
+    <<: *common-config
+    volumes:
+      - ./config/mapnav:/config/mapnav:ro
+      - ./maps:/maps
+    command: >
+      ros2 launch husarion_ugv_navigation bringup_launch.py
+        namespace:=${ROBOT_NAMESPACE:-panther}
+        robot_model:=${ROBOT_MODEL:-panther}
+        observation_topic:=/${ROBOT_NAMESPACE:-panther}/scan
+        observation_topic_type:=laserscan
         use_collision_monitor:=True
         cmd_vel_out:=autonomous/cmd_vel
         slam:=${SLAM:-True}
