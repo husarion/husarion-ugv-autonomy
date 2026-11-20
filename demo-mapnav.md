@@ -41,18 +41,18 @@ chronyc sources        # 10.15.20.2 must be the selected source, marked ^*
 
 ## 2. The LiDAR on the robot: `components.yaml`
 
-The robot describes the LiDAR (and its sensor gate) in its own URDF, so the LiDAR's frames are on the robot's TF tree like every other part. In the Cockpit open **Manage › Robot › Driver files**, edit `components.yaml` and apply; the driver restarts with the new description. For a Panther with the DEV09 large gate and an Ouster on the front of the mounting rails, centred:
+The robot describes the LiDAR (and its sensor gate) in its own URDF, so the LiDAR's frames are on the robot's TF tree like every other part. In the Cockpit open **Manage › Robot › Driver files**, edit `components.yaml` and apply; the driver restarts with the new description. The reference configuration of this demo is a Panther with the DEV09 large gate and the Ouster on the mounting rails inside the gate, centred, 0.135 m ahead of the rails' centre:
 
 ```yaml
 components:
   - type: DEV09
   - type: LDR17            # Ouster OS2-64; LDR10 for an OS0-32
     parent_link: mount_link
-    xyz: 0.22 0.0 0.0      # the front crossbar of the rails, centred
+    xyz: 0.135 0.0 0.0125  # the reference place: on its 12.5 mm base plate on the rails, inside the gate
     rpy: 0.0 0.0 0.0       # connector facing the rear
 ```
 
-On a Panther the mounting rails run from x = −0.229 m to +0.229 m about `mount_link` (the body mesh), so a sensor on the 20 mm front crossbar has its base centre at x = 0.22 m, right above the front axle. `xyz` is the centre of the sensor's base on the rail: `x` forward from the middle of the rails, `y` to the left, `z` up from the rail. With the connector facing forward, set `rpy: 0.0 0.0 3.14159`. The model places the lidar origin 74.3 mm (OS2) or 36.2 mm (OS0, OS1) above the base and turns it 180°, as the sensor itself does. A unit can differ by a few millimetres; its own value is in the sensor's `lidar_intrinsics`. This needs a driver image whose `husarion_components_description` has the OS2 codes and the 180° turn.
+`xyz` is the centre of the sensor's base (its underside): `x` forward from the middle of the rails, `y` to the left, `z` up from the top of the rails; in the reference configuration the Ouster stands on a 12.5 mm base plate, hence `z` 0.0125. With `rpy: 0 0 0` its connector faces the rear, as in the reference configuration; with the connector facing forward, set `rpy: 0.0 0.0 3.14159`. The model places the lidar origin 74.3 mm (OS2) or 36.2 mm (OS0, OS1) above the base and turns it 180°, as the sensor itself does. A unit can differ by a few millimetres; its own value is in the sensor's `lidar_intrinsics`. This needs a driver image whose `husarion_components_description` has the OS2 codes and the 180° turn.
 
 Check: drive the robot towards a wall. In the Cockpit's 3D view the scan must show the wall in front of the robot, not behind it.
 
@@ -238,22 +238,19 @@ If the `husarion-rplidar` snap is installed on the user computer, stop it first;
 sudo snap stop --disable husarion-rplidar
 ```
 
-**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2: `LDR04` for the A3, `LDR06` for the S3 (the names `rplidar_a3` and `rplidar_s3` also work with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. The demo's place for the LiDAR is the front crossbar of the rails, centred, the same place as the Ouster in §2:
+**Place it on the robot** in `components.yaml` (Manage › Robot › Driver files), like the Ouster in §2: `LDR04` for the A3, `LDR06` for the S3 (the names `rplidar_a3` and `rplidar_s3` also work with a newer driver image). The robot's URDF then carries `$NS/laser` (`$NS/<name>_laser` with a component `name:`, then set `RPLIDAR_FRAME=<name>_laser`), and the driver stamps the scan in that frame and publishes no transform. The demo's place for the LiDAR is the Ouster's place in the reference configuration (§2), with the same entry:
 
 ```yaml
 components:
   - type: LDR04            # Slamtec RPLIDAR A3; LDR06 for an S3
     parent_link: mount_link
-    xyz: 0.22 0.0 0.0      # the front crossbar, centred: the Ouster's place (LDR10/LDR17 at 0.22 0 0, §2)
+    xyz: 0.135 0.0 0.0125  # the Ouster's place in the reference configuration (§2): on the rails inside the gate
     rpy: 0.0 0.0 0.0       # cable to the rear; 0.0 0.0 3.14159 with the cable to the front
 ```
 
-`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 31 mm (A3) or 30.5 mm (S3) above the base, so 3 cm above the rail. **With `rpy: 0 0 0` the sensor's cable (its interface lead) points to the rear of the robot**: the model turns `laser` 180° from the sensor's base, and Slamtec's ROS frame has its x axis towards the cable. Mounted the other way round, with the cable to the front, set `rpy: 0.0 0.0 3.14159`. The S3's cable is taken to follow the same rule; the wall check below confirms either.
+`xyz` is the centre of the sensor's base, as for the Ouster. The model puts the scan plane 31 mm (A3) or 30.5 mm (S3) above the sensor's base, so about 43 mm above the rails at this place; if the sensor sits directly on the rails, with no base plate, set `z` 0.0 and the plane is about 31 mm up. **With `rpy: 0 0 0` the sensor's cable (its interface lead) points to the rear of the robot**: the model turns `laser` 180° from the sensor's base, and Slamtec's ROS frame has its x axis towards the cable. Mounted the other way round, with the cable to the front, set `rpy: 0.0 0.0 3.14159`. The S3's cable is taken to follow the same rule; the wall check below confirms either.
 
-> **A DEV09 gate and an RPLIDAR on the rail do not go together.** The DEV09's four posts stand on the rail from 0.08 m to 0.12 m in front of and behind the rail's centre, 0.23 m to 0.26 m to each side, and rise 0.25 m (the gate's model in husarion_components_description). A scan plane 3 cm above the rail cuts all four, about 0.27 m from a sensor at the front crossbar, inside the robot's footprint. With no crop box in the 2D path, the collision monitor counts them as an obstacle inside its stop polygon and **holds the robot still for good: Nav2 accepts a goal and the robot never moves** (this is what the simulation showed with a post of the robot's own in the scan plane). Choose one:
-> - **No DEV09 on the robot** when the LiDAR is an RPLIDAR on the rail.
-> - **Raise the LiDAR above the gate**: on a plate or riser on top of the DEV09, so the scan plane is above its top bar (0.25 m above the rail) and above anything else mounted on the robot. In `components.yaml` give it the riser's height in `xyz`, e.g. `xyz: 0.0 0.0 0.27` with the base 0.27 m above the rail; the antennas and cameras must then be below the plane too.
-> - **A laser filter** that removes the posts' angles from the scan before Nav2 reads it (for example `laser_filters`' angular or box filter). This project does not ship one; it would be one more service between `scan` and the stack, and it also blinds the LiDAR in those directions.
+> **At this place the DEV09's posts are in the scan plane, and the robot will not move.** In the reference configuration the DEV09 stands with its centre 0.09 m ahead of the rails' centre. Its four posts rise from the rails to 0.25 m: two at x 0.136 m to 0.18 m and two at x 0 m to 0.044 m, each 0.234 m to 0.261 m to the side (its top frame, 0.23 m to 0.25 m up, and the camera on it are above the plane; the wheels' tops are 3 cm below it). A scan plane 43 mm above the rails at x = 0.135 m cuts all four: the front pair straight to the sides at about 0.23 m, the rear pair at about 0.25 m to 0.29 m. That is inside the robot's footprint, and the 2D path has no crop box, so the collision monitor counts the posts as an obstacle inside its stop polygon and **holds the robot still for good: Nav2 accepts a goal and the robot never moves** (what the simulation showed with a post of the robot's own in the scan plane). Until this project removes the robot from a 2D scan, run an RPLIDAR at this place **only without the DEV09**. The posts would have to be taken out of the scan before Nav2 reads it (a box filter around the robot), which the images pinned here do not include.
 
 > **Keep the robot out of the scan plane** for the same reason, whatever else is mounted: a mast, an antenna or a camera bracket level with the sensor stops the robot the same way.
 
