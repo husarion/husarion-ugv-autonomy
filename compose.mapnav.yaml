@@ -46,7 +46,8 @@ services:
         attempt_reconnect:=true
         viz:=false
 
-  # Nav2 on the Ouster's cloud (demo-mapnav.md §4).
+  # Nav2 on the Ouster's cloud (demo-mapnav.md §4), with the Cockpit's map gateway: the map, the
+  # pose, the plan, pause and resume and the saved maps (in ./maps) for the Operate map.
   navigation:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
     profiles: [ouster]
@@ -66,6 +67,7 @@ services:
         scan_max_height:=${SCAN_MAX_HEIGHT:-1.0}
         use_collision_monitor:=True
         cmd_vel_out:=autonomous/cmd_vel
+        use_map_gateway:=True
         slam:=${SLAM:-True}
         map_update_interval:=5.0
         map:=/maps/${MAP_NAME:-map}/map.yaml
@@ -150,6 +152,7 @@ services:
         scan_max_height:=2.0
         use_collision_monitor:=True
         cmd_vel_out:=autonomous/cmd_vel
+        use_map_gateway:=True
         slam:=${SLAM:-True}
         map_update_interval:=5.0
         map:=/maps/${MAP_NAME:-map}/map.yaml

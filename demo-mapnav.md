@@ -109,6 +109,8 @@ The settings, each with its default:
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
+The stack runs the Cockpit's map gateway (`husarion_ugv_map_gateway`): it sends the map, the robot's pose and the plan to the Operate map, aligns the map to GNSS, takes pause and resume, and saves maps into `./maps` from the Cockpit.
+
 At start the stack reads the rail's height (`$NS/mount_link` above `$NS/base_footprint`) from the robot's TF. It fails after 30 s if the robot's TF is not visible from the user computer. Everything inside the robot's footprint up to `ROBOT_HEIGHT` is the robot itself (the gate, cameras, antennas) and is dropped from the cloud.
 
 ### LiDAR profiles
