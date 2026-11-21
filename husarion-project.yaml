@@ -1,0 +1,80 @@
+# The Husarion Cockpit installs this project on a robot's user computer from this file
+# (husarion-agent's schemas/husarion-project.schema.json, schema 1). The Cockpit's install form
+# shows the `env` fields; the stack is compose.mapnav.yaml, which also runs by hand (demo-mapnav.md).
+schema: 1
+id: husarion-ugv-autonomy
+name: Autonomy with Nav2 and slam_toolbox
+licence: Apache-2.0
+robots: [panther, lynx]
+ros_distro: jazzy
+architectures: [amd64, arm64]
+drives_robot: true
+provides: [nav]
+needs:
+  disk_gb: 12
+  ram_gb: 8
+  internet: install
+  sensors_by_profile:
+    ouster: [{kind: lidar_3d}]
+    rplidar: [{kind: lidar_2d}]
+    oak: [{kind: camera}]
+profiles:
+  hardware:
+    compose: [compose.mapnav.yaml]
+env:
+  - key: ROBOT_NAMESPACE
+    from: robot.namespace
+  - key: ROBOT_MODEL
+    from: robot.model
+  - key: LIDAR
+    label: LiDAR
+    type: choice
+    default: ouster
+    options:
+      - {value: ouster, label: Ouster, compose_profiles: [ouster]}
+      - {value: rplidar_a3, label: Slamtec RPLIDAR A3, compose_profiles: [rplidar]}
+      - {value: rplidar_s3, label: Slamtec RPLIDAR S3, compose_profiles: [rplidar]}
+  - key: LIDAR_PROFILE
+    label: Ouster model
+    help: The OS2-64 cannot see near the robot, so the robot never drives faster than 0.3 m/s with it.
+    type: choice
+    default: os2_64
+    when: {LIDAR: ouster}
+    options:
+      - {value: os0_32, label: OS0-32}
+      - {value: os2_64, label: OS2-64}
+  - key: OUSTER_HOSTNAME
+    label: Ouster address
+    type: string
+    default: 10.15.20.5
+    when: {LIDAR: ouster}
+  - key: ROBOT_HEIGHT
+    label: Robot height in metres
+    help: The top of the robot with everything mounted on it. Measure your robot.
+    type: string
+    default: "0.7"
+    required: true
+  - key: SLAM
+    label: Build a new map
+    help: Off, the robot localizes on a saved map and starts where that map was saved.
+    type: bool
+    default: true
+  - key: MAP_NAME
+    label: Saved map
+    type: string
+    required: true
+    when: {SLAM: false}
+  - key: USE_OAK
+    label: Luxonis OAK camera
+    help: The OAK's video in the Cockpit. Leave off without an OAK connected.
+    type: bool
+    default: false
+    compose_profiles: [oak]
+  - key: OAK_IP
+    label: OAK address
+    type: string
+    default: 10.15.20.6
+    when: {USE_OAK: true}
+data: [maps]
+status:
+  ready_when: compose_healthy

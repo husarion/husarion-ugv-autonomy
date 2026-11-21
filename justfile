@@ -103,6 +103,17 @@ mapnav-rplidar-up:
 mapnav-down:
     docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak down
 
+# Save the map being built as ./maps/<name>/ with its sidecar (demo-mapnav.md §5): letters, digits, - and _
+mapnav-save $name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ "$name" =~ ^[A-Za-z0-9_-]{1,64}$ ]] || { echo "map name: letters, digits, - and _ only" >&2; exit 2; }
+    svc=$(docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar ps --services --status running | grep -E '^navigation(_rplidar)?$' | head -1 || true)
+    [ -n "$svc" ] || { echo "the map-nav stack is not running" >&2; exit 1; }
+    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar exec "$svc" \
+      ros2 service call "/${ROBOT_NAMESPACE:-panther}/map_gateway/serialize_map" \
+      slam_toolbox/srv/SerializePoseGraph "{filename: '$name'}"
+
 # Follow the map-nav stack's logs
 mapnav-logs:
     docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak logs -f

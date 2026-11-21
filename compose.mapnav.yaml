@@ -12,39 +12,71 @@
 #   crop box and slice as the Ouster's, at 0.3 m/s at most.
 # The OAK's video for the Cockpit is one more service behind the `oak` profile, off unless
 # `--profile oak` is given (demo-mapnav.md §7).
-# Every value below has a default; override it in the shell or in a `.env.mapnav` passed with
-# --env-file.
+#
+# The Cockpit installs this project from husarion-project.yaml (its install form sets the
+# variables below); it runs the same way by hand. Every value has a default; override it in the
+# shell or in an env file passed with --env-file. Nothing here starts after a boot by itself:
+# every service restarts only on failure, never `always`.
+#
+# ROS networking comes from the robot, not from a file in this repo (demo-mapnav.md §4):
+# RMW_IMPLEMENTATION, ROS_DOMAIN_ID and ROS_AUTOMATIC_DISCOVERY_RANGE as the robot's Network page
+# sets them, and Cyclone's own setting passed inline in CYCLONEDDS_URI (an XML document, no file).
+# The default matches the robot's default network profile (factory-hardened-mcast): multicast for
+# participant discovery only, the robot's two computers as unicast peers, and this computer's
+# interface chosen by its address on the robot's LAN, USER_COMPUTER_ADDRESS (10.15.20.3). Cyclone
+# refuses to start when no interface has that address. A robot on a unicast-only profile needs
+# another CYCLONEDDS_URI, which the Cockpit's installer renders from the robot's profile.
+
+x-ros-env: &ros-env
+  RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+  ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+  ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}
+  CYCLONEDDS_URI: '${CYCLONEDDS_URI:-<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface address="${USER_COMPUTER_ADDRESS:-10.15.20.3}"/></Interfaces><AllowMulticast>spdp</AllowMulticast><EnableMulticastLoopback>true</EnableMulticastLoopback></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>30</MaxAutoParticipantIndex><Peers><Peer Address="10.15.20.2"/><Peer Address="10.15.20.3"/></Peers></Discovery></Domain></CycloneDDS>}'
+
+# "Healthy" means the service's ROS processes are alive. The checks read /proc only: a `ros2` CLI
+# call would join the ROS graph on every check, and the robot's airlock pays for each newcomer.
+# The `[x]` in a pattern keeps grep from matching its own command line.
+x-health: &health
+  interval: 10s
+  timeout: 5s
+  retries: 3
+  start_period: 60s
 
 x-common-config: &common-config
   network_mode: host
   ipc: host
-  env_file: mapnav.env  # CYCLONEDDS_URI points into ./config/mapnav, so every service mounts it
+  restart: on-failure
+  environment: *ros-env
 
 services:
   ouster:
     image: husarion/ouster:jazzy-map-nav@sha256:f1d681a3294cb2dd1564383380e34a3f352e9105feda0daaff52eb3ad1e7aa20
     profiles: [ouster]
     <<: *common-config
-    volumes:
-      - ./config/mapnav:/config/mapnav:ro
     # The robot's URDF places the sensor (components.yaml), so the driver publishes no transform
     # and stamps the cloud in the URDF's lidar frame. Sensor data, best effort.
-    command: >
-      ros2 launch ouster_ros sensor.composite.launch.xml
-        ouster_ns:=${ROBOT_NAMESPACE:-panther}
-        sensor_hostname:=${OUSTER_HOSTNAME:-10.15.20.5}
-        lidar_mode:=1024x10
-        timestamp_mode:=TIME_FROM_ROS_TIME
-        proc_mask:=PCL
-        pub_static_tf:=false
-        sensor_frame:=${ROBOT_NAMESPACE:-panther}/ouster_link
-        lidar_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
-        point_cloud_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
-        imu_frame:=${ROBOT_NAMESPACE:-panther}/os_imu
-        use_system_default_qos:=false
-        persist_config:=false
-        attempt_reconnect:=true
-        viz:=false
+    command:
+      - ros2
+      - launch
+      - ouster_ros
+      - sensor.composite.launch.xml
+      - ouster_ns:=${ROBOT_NAMESPACE:-panther}
+      - sensor_hostname:=${OUSTER_HOSTNAME:-10.15.20.5}
+      - lidar_mode:=1024x10
+      - timestamp_mode:=TIME_FROM_ROS_TIME
+      - proc_mask:=PCL
+      - pub_static_tf:=false
+      - sensor_frame:=${ROBOT_NAMESPACE:-panther}/ouster_link
+      - lidar_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
+      - point_cloud_frame:=${ROBOT_NAMESPACE:-panther}/os_lidar
+      - imu_frame:=${ROBOT_NAMESPACE:-panther}/os_imu
+      - use_system_default_qos:=false
+      - persist_config:=false
+      - attempt_reconnect:=true
+      - viz:=false
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'os_containe[r]' /proc/[0-9]*/cmdline"]
 
   # Nav2 on the Ouster's cloud (demo-mapnav.md §4), with the Cockpit's map gateway: the map, the
   # pose, the plan, pause and resume and the saved maps (in ./maps) for the Operate map.
@@ -53,42 +85,55 @@ services:
     profiles: [ouster]
     <<: *common-config
     volumes:
-      - ./config/mapnav:/config/mapnav:ro
       - ./maps:/maps
-    command: >
-      ros2 launch husarion_ugv_navigation bringup_launch.py
-        namespace:=${ROBOT_NAMESPACE:-panther}
-        robot_model:=${ROBOT_MODEL:-panther}
-        observation_topic:=${OBSERVATION_TOPIC:-/${ROBOT_NAMESPACE:-panther}/points}
-        observation_topic_type:=pointcloud
-        lidar_profile:=${LIDAR_PROFILE:-os0_32}
-        robot_height:=${ROBOT_HEIGHT:-0.7}
-        scan_min_height:=${SCAN_MIN_HEIGHT:-0.25}
-        scan_max_height:=${SCAN_MAX_HEIGHT:-1.0}
-        use_collision_monitor:=True
-        cmd_vel_out:=autonomous/cmd_vel
-        use_map_gateway:=True
-        slam:=${SLAM:-True}
-        map_update_interval:=5.0
-        map:=/maps/${MAP_NAME:-map}/map.yaml
-        initial_pose_from_sidecar:=True
-        use_sim_time:=False
+    command:
+      - ros2
+      - launch
+      - husarion_ugv_navigation
+      - bringup_launch.py
+      - namespace:=${ROBOT_NAMESPACE:-panther}
+      - robot_model:=${ROBOT_MODEL:-panther}
+      - observation_topic:=${OBSERVATION_TOPIC:-/${ROBOT_NAMESPACE:-panther}/points}
+      - observation_topic_type:=pointcloud
+      - lidar_profile:=${LIDAR_PROFILE:-os0_32}
+      - robot_height:=${ROBOT_HEIGHT:-0.7}
+      - scan_min_height:=${SCAN_MIN_HEIGHT:-0.25}
+      - scan_max_height:=${SCAN_MAX_HEIGHT:-1.0}
+      - use_collision_monitor:=True
+      - cmd_vel_out:=autonomous/cmd_vel
+      - use_map_gateway:=True
+      - slam:=${SLAM:-True}
+      - map_update_interval:=5.0
+      - map:=/maps/${MAP_NAME:-map}/map.yaml
+      - initial_pose_from_sidecar:=True
+      - use_sim_time:=False
+    healthcheck: &nav-health
+      <<: *health
+      test:
+        - CMD-SHELL
+        # Nav2 runs composed in nav2_container (the collision monitor too), beside the gateway.
+        - >-
+          grep -qa '__node:=nav2_containe[r]' /proc/[0-9]*/cmdline &&
+          grep -qa '__node:=map_gatewa[y]' /proc/[0-9]*/cmdline
 
   # A Slamtec RPLIDAR (demo-mapnav.md §8) on the user computer's USB port: RPLIDAR_MODEL a3 (the
-  # A3, the default) or s3 (the S3, not tested on a sensor yet). The model sets the serial rate and
-  # the scan mode of sllidar_ros2's own launch file for it; a model not listed stops the service at
-  # start. The robot's URDF places the sensor (components.yaml: LDR04 for the A3, LDR06 for the S3),
-  # so the driver publishes no transform and stamps the scan in the URDF's frame. Its raw scan is
-  # /<ns>/rplidar/scan: /<ns>/scan is the stack's, after the robot is cropped out (below).
+  # A3, the default) or s3 (the S3, not tested on a sensor yet); the install form's LIDAR value
+  # (rplidar_a3, rplidar_s3) sets it when RPLIDAR_MODEL is not given. The model sets the serial
+  # rate and the scan mode of sllidar_ros2's own launch file for it; a model not listed stops the
+  # service at start. The robot's URDF places the sensor (components.yaml: LDR04 for the A3, LDR06
+  # for the S3), so the driver publishes no transform and stamps the scan in the URDF's frame. Its
+  # raw scan is /<ns>/rplidar/scan: /<ns>/scan is the stack's, after the robot is cropped out
+  # (below). The values reach the script as environment variables, never as script text.
   rplidar:
     # rplidar-docker jazzy 1.0.1 (sllidar_ros2), amd64 + arm64.
     image: husarion/rplidar:jazzy-1.0.1-20260522@sha256:15afa7295060e31e68c49ac45a0fbaad85d87e73e9dd27c1690ab5a46bff3d4e
     profiles: [rplidar]
     <<: *common-config
     environment:
-      RPLIDAR_MODEL: ${RPLIDAR_MODEL:-a3}
-    volumes:
-      - ./config/mapnav:/config/mapnav:ro
+      <<: *ros-env
+      RPLIDAR_MODEL: ${RPLIDAR_MODEL:-${LIDAR:-a3}}
+      RPLIDAR_NS: ${ROBOT_NAMESPACE:-panther}
+      RPLIDAR_FRAME: ${RPLIDAR_FRAME:-laser}
     devices:
       - ${RPLIDAR_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
     command:
@@ -96,17 +141,20 @@ services:
       - -c
       - |
         case "$$RPLIDAR_MODEL" in
-          s3) baud=1000000; mode=DenseBoost ;;
-          a3) baud=256000; mode=Sensitivity ;;
+          s3|rplidar_s3) baud=1000000; mode=DenseBoost ;;
+          a3|rplidar_a3) baud=256000; mode=Sensitivity ;;
           *) echo "RPLIDAR_MODEL must be s3 or a3, not '$$RPLIDAR_MODEL'" >&2; exit 2 ;;
         esac
         echo "RPLIDAR $$RPLIDAR_MODEL: $$baud baud, scan mode $$mode"
         exec ros2 launch /husarion_utils/rplidar.launch.yaml \
-          namespace:=${ROBOT_NAMESPACE:-panther}/rplidar \
+          "namespace:=$$RPLIDAR_NS/rplidar" \
           serial_port:=/dev/ttyUSB0 \
-          serial_baudrate:=$$baud \
-          scan_mode:=$$mode \
-          frame_id:=${ROBOT_NAMESPACE:-panther}/${RPLIDAR_FRAME:-laser}
+          "serial_baudrate:=$$baud" \
+          "scan_mode:=$$mode" \
+          "frame_id:=$$RPLIDAR_NS/$$RPLIDAR_FRAME"
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'sllidar_nod[e]' /proc/[0-9]*/cmdline"]
 
   # The RPLIDAR's scan as a point cloud (/<ns>/rplidar/points, in the scan's own frame), so the 2D
   # path runs through the same crop box and slice as the Ouster's cloud: the crop box drops the
@@ -116,14 +164,21 @@ services:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
     profiles: [rplidar]
     <<: *common-config
-    volumes:
-      - ./config/mapnav:/config/mapnav:ro
-    command: >
-      ros2 run pointcloud_to_laserscan laserscan_to_pointcloud_node
-        --ros-args
-        -r __ns:=/${ROBOT_NAMESPACE:-panther}
-        -r scan_in:=rplidar/scan
-        -r cloud:=rplidar/points
+    command:
+      - ros2
+      - run
+      - pointcloud_to_laserscan
+      - laserscan_to_pointcloud_node
+      - --ros-args
+      - -r
+      - __ns:=/${ROBOT_NAMESPACE:-panther}
+      - -r
+      - scan_in:=rplidar/scan
+      - -r
+      - cloud:=rplidar/points
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'laserscan_to_pointcloud_nod[e]' /proc/[0-9]*/cmdline"]
 
   # Nav2 on the RPLIDAR's cloud (either model), the Ouster's path: the crop box drops everything
   # inside the footprint up to ROBOT_HEIGHT, the slice (0.05 m to 2.0 m, so the scan plane is in it
@@ -138,26 +193,29 @@ services:
     profiles: [rplidar]
     <<: *common-config
     volumes:
-      - ./config/mapnav:/config/mapnav:ro
       - ./maps:/maps
-    command: >
-      ros2 launch husarion_ugv_navigation bringup_launch.py
-        namespace:=${ROBOT_NAMESPACE:-panther}
-        robot_model:=${ROBOT_MODEL:-panther}
-        observation_topic:=/${ROBOT_NAMESPACE:-panther}/rplidar/points
-        observation_topic_type:=pointcloud
-        lidar_profile:=${RPLIDAR_SPEED_CAP:-os2_64}
-        robot_height:=${ROBOT_HEIGHT:-0.7}
-        scan_min_height:=0.05
-        scan_max_height:=2.0
-        use_collision_monitor:=True
-        cmd_vel_out:=autonomous/cmd_vel
-        use_map_gateway:=True
-        slam:=${SLAM:-True}
-        map_update_interval:=5.0
-        map:=/maps/${MAP_NAME:-map}/map.yaml
-        initial_pose_from_sidecar:=True
-        use_sim_time:=False
+    command:
+      - ros2
+      - launch
+      - husarion_ugv_navigation
+      - bringup_launch.py
+      - namespace:=${ROBOT_NAMESPACE:-panther}
+      - robot_model:=${ROBOT_MODEL:-panther}
+      - observation_topic:=/${ROBOT_NAMESPACE:-panther}/rplidar/points
+      - observation_topic_type:=pointcloud
+      - lidar_profile:=${RPLIDAR_SPEED_CAP:-os2_64}
+      - robot_height:=${ROBOT_HEIGHT:-0.7}
+      - scan_min_height:=0.05
+      - scan_max_height:=2.0
+      - use_collision_monitor:=True
+      - cmd_vel_out:=autonomous/cmd_vel
+      - use_map_gateway:=True
+      - slam:=${SLAM:-True}
+      - map_update_interval:=5.0
+      - map:=/maps/${MAP_NAME:-map}/map.yaml
+      - initial_pose_from_sidecar:=True
+      - use_sim_time:=False
+    healthcheck: *nav-health
 
   # The OAK's video for the Cockpit (demo-mapnav.md §7). Off unless asked: `--profile oak`.
   # On-chip H.264 from stock depthai-ros, relayed as CompressedVideo, which the airlock carries
@@ -169,16 +227,19 @@ services:
     image: husarion/depthai:jazzy-map-nav@sha256:e0824df77b0a223d8ad37766be3e5d29b46e7dc18a9c6bbce5b34f4d774da623
     profiles: [oak]
     <<: *common-config
-    volumes:
-      - ./config/mapnav:/config/mapnav:ro
     # depthai's camera and the H.264 relay, two components in one container (packets cross
     # in-process). The launch file holds the camera's parameters (demo-mapnav.md §7): RGB only,
     # encoded on the chip as H.264 baseline, a keyframe every 30 frames, no IMU, no IR, and no
     # description or transform (the robot's URDF places the OAK, CAM12). depthai publishes
     # FFMPEGPacket on oak/rgb/image_raw/compressed; the relay, CompressedVideo on
     # oak/rgb/image_raw/h264.
-    command: >
-      ros2 launch /ros2_ws/launch/oak_h264.launch.py
-        namespace:=${ROBOT_NAMESPACE:-panther}
-        ip:=${OAK_IP:-10.15.20.6}
-        bitrate:=${OAK_BITRATE:-3400000}
+    command:
+      - ros2
+      - launch
+      - /ros2_ws/launch/oak_h264.launch.py
+      - namespace:=${ROBOT_NAMESPACE:-panther}
+      - ip:=${OAK_IP:-10.15.20.6}
+      - bitrate:=${OAK_BITRATE:-3400000}
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'component_containe[r]' /proc/[0-9]*/cmdline"]

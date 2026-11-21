@@ -4,6 +4,8 @@ A collection of packages containing autonomous functionalities for Husarion UGV 
 
 ![autonomy-result](https://github-readme-figures.s3.eu-central-1.amazonaws.com/panther/husarion_ugv/husarion_ugv_autonomy.webp)
 
+> **Disclaimer.** This is a reference project, provided as is, without warranty of any kind. It makes the robot move on its own. Run it only where the robot can do no harm, watch the robot while it drives, and keep the e-stop in reach. It does not replace your own safety assessment for your robot, your site and your use. The Husarion Cockpit can install it on a robot's user computer (`husarion-project.yaml`); that does not change any of the above.
+
 ## 🚀 Demo
 
 Below are two articles describing how to run the autonomy demo — one in simulation and the other on a physical robot.

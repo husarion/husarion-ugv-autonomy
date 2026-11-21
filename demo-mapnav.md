@@ -19,7 +19,7 @@ The older demos (`compose.hardware.yaml`, `compose.simulation.yaml`, `demo-hw.md
 ## Before you start
 
 - Docker with the compose plugin on the user computer, which sits at `10.15.20.3` on the robot's LAN.
-- The robot runs Husarion UGV OS. Its fleet side is ROS 2 domain 0 with Cyclone DDS, which is what this stack uses.
+- The robot runs Husarion UGV OS. Its fleet side is ROS 2 domain 0 with Cyclone DDS under the `factory-hardened-mcast` network profile, which is what this stack uses by default (§4, ROS networking).
 - Your robot's namespace: the robot's name in the Cockpit, or `ROS_NAMESPACE` on the robot. Below it is `NS`:
 
   ```bash
@@ -58,7 +58,7 @@ Check: drive the robot towards a wall. In the Cockpit's 3D view the scan must sh
 
 ## 3. The Ouster driver
 
-The driver runs as the `ouster` service of `compose.mapnav.yaml`, with the same Cyclone DDS profile as Nav2. Set the sensor to the static address `10.15.20.5` first (Ouster's web page or its HTTP API), or set `OUSTER_HOSTNAME`.
+The driver runs as the `ouster` service of `compose.mapnav.yaml`, with the same ROS networking as Nav2 (§4). Set the sensor to the static address `10.15.20.5` first (Ouster's web page or its HTTP API), or set `OUSTER_HOSTNAME`.
 
 If the `husarion-ouster` snap is installed on the user computer, stop it first. Two drivers would fight over the sensor:
 
@@ -105,7 +105,21 @@ The settings, each with its default:
 | `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
 | `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
-| `RPLIDAR_MODEL`, `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `a3`, `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the model (`a3` or `s3`), its serial port, its frame below the namespace, and its 0.3 m/s speed cap (`os0_32`: none) |
+| `RPLIDAR_MODEL`, `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `a3` (or from `LIDAR`: `rplidar_a3`, `rplidar_s3`), `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the model (`a3` or `s3`), its serial port, its frame below the namespace, and its 0.3 m/s speed cap (`os0_32`: none) |
+
+### ROS networking
+
+The stack takes the robot's ROS settings and mounts no DDS file:
+
+| Variable | Default | What |
+| -- | -- | -- |
+| `RMW_IMPLEMENTATION`, `ROS_DOMAIN_ID`, `ROS_AUTOMATIC_DISCOVERY_RANGE` | `rmw_cyclonedds_cpp`, `0`, `SUBNET` | As the robot's Network page sets them (`network/shared.env` on the robot) |
+| `USER_COMPUTER_ADDRESS` | `10.15.20.3` | This computer's address on the robot's LAN. Cyclone uses the interface that has it, and refuses to start when none has |
+| `CYCLONEDDS_URI` | the robot's default profile, inline | Cyclone's own setting as an XML document, in place of the default below |
+
+The default Cyclone setting matches the robot's default network profile, `factory-hardened-mcast`: multicast for participant discovery only, the robot's computers `10.15.20.2` and `10.15.20.3` as unicast peers, and this computer's interface by its address. A robot set to a unicast-only profile (`factory-hardened`, `factory-unicast`) needs a `CYCLONEDDS_URI` without multicast; the Cockpit's installer renders it from the robot's profile. Never copy a profile file from the robot: it names the robot's own interface and a receive buffer an ordinary computer may not allow.
+
+Every service restarts only when it fails, never after a boot: start the stack again yourself after the user computer restarts. A service reads healthy while its ROS processes are alive (`docker compose -f compose.mapnav.yaml ps`).
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
@@ -134,6 +148,14 @@ ROBOT_NAMESPACE=$NS SLAM=False MAP_NAME=<name> docker compose -f compose.mapnav.
 ```
 
 The stack refuses to start when the sidecar is missing, has no `saved_pose`, or belongs to another image. AMCL never starts at 0, 0, 0 on a saved map by accident.
+
+To save the map being built as `./maps/<name>/`, with its sidecar, while the stack maps:
+
+```bash
+ROBOT_NAMESPACE=$NS just mapnav-save <name>
+```
+
+The map gateway writes the pair, the sidecar and slam_toolbox's pose graph, and never overwrites a saved pair: choose a new name. It refuses while no pose is known or in AMCL mode. The Cockpit's Operate map saves the same way.
 
 ## 6. Stop
 
