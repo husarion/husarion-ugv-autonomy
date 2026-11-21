@@ -222,21 +222,20 @@ services:
     healthcheck: *nav-health
 
   # The OAK's video for the Cockpit (demo-mapnav.md §7). Off unless asked: `--profile oak`.
-  # On-chip H.264 from stock depthai-ros, relayed as CompressedVideo, which the airlock carries
-  # through one inbound lane to the robot's camera node. No raw image leaves this computer, and
-  # the OAK stays out of navigation. The relay is in the depthai image: when the airlock carries
-  # FFMPEGPacket (airlock 1.30.0), it goes from that image's launch file.
+  # On-chip H.264 from stock depthai-ros as FFMPEGPacket, which the airlock (1.30.0 and later)
+  # carries through one inbound lane to the robot's camera node. No raw image leaves this
+  # computer, and the OAK stays out of navigation.
   oak:
-    # depthai-docker map-nav 93d2782: stock depthai-ros 2.13.0 plus the relay, amd64 + arm64.
-    image: husarion/depthai:jazzy-map-nav@sha256:e0824df77b0a223d8ad37766be3e5d29b46e7dc18a9c6bbce5b34f4d774da623
+    # depthai-docker map-nav 8368f8b: stock depthai-ros 2.13.0, amd64 + arm64.
+    # PLACEHOLDER digest: replace sha256:000... with the digest of husarion/depthai:jazzy-map-nav
+    # once CI has published it from that commit (no relay in it).
+    image: husarion/depthai:jazzy-map-nav@sha256:0000000000000000000000000000000000000000000000000000000000000000
     profiles: [oak]
     <<: *common-config
-    # depthai's camera and the H.264 relay, two components in one container (packets cross
-    # in-process). The launch file holds the camera's parameters (demo-mapnav.md §7): RGB only,
-    # encoded on the chip as H.264 baseline, a keyframe every 30 frames, no IMU, no IR, and no
-    # description or transform (the robot's URDF places the OAK, CAM12). depthai publishes
-    # FFMPEGPacket on oak/rgb/image_raw/compressed; the relay, CompressedVideo on
-    # oak/rgb/image_raw/h264.
+    # depthai's camera as a component. The launch file holds its parameters (demo-mapnav.md §7):
+    # RGB only, encoded on the chip as H.264 baseline, a keyframe every 30 frames, no IMU, no IR,
+    # and no description or transform (the robot's URDF places the OAK, CAM12). depthai publishes
+    # FFMPEGPacket on oak/rgb/image_raw/compressed.
     command:
       - ros2
       - launch

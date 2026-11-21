@@ -167,12 +167,9 @@ Naming every profile stops whichever LiDAR runs and the OAK's service when it ru
 
 ## 7. The OAK's video in the Cockpit (optional)
 
-An OAK-D Pro PoE on the robot's LAN (`10.15.20.6` on the reference robots) can show its colour camera in the Cockpit. One service does it, `oak`, behind the compose profile `oak`, so nothing about it starts unless you ask. It runs the depthai image (`husarion/depthai`: stock depthai-ros 2.13.0 plus Husarion's H.264 relay) with its launch file `/ros2_ws/launch/oak_h264.launch.py`, which loads two components into one container, so each packet crosses from one to the other in-process:
+An OAK-D Pro PoE on the robot's LAN (`10.15.20.6` on the reference robots) can show its colour camera in the Cockpit. One service does it, `oak`, behind the compose profile `oak`, so nothing about it starts unless you ask. It runs the depthai image (`husarion/depthai`: stock depthai-ros 2.13.0) with its launch file `/ros2_ws/launch/oak_h264.launch.py`, which loads depthai's camera (node `oak`) as a component: the OAK encodes its colour stream as H.264 on its own chip and the driver publishes it as `ffmpeg_image_transport_msgs/FFMPEGPacket` on `/$NS/oak/rgb/image_raw/compressed`, about 0.4 MB/s at 1280×720 and 30 fps. No raw image is published.
 
-- **depthai's camera** (node `oak`): the OAK encodes its colour stream as H.264 on its own chip and the driver publishes it as `ffmpeg_image_transport_msgs/FFMPEGPacket` on `/$NS/oak/rgb/image_raw/compressed`, about 0.4 MB/s at 1280×720 and 30 fps. No raw image is published.
-- **the relay** (node `ffmpeg_to_compressed_video`) copies each packet's bytes into a `foxglove_msgs/CompressedVideo` on `/$NS/oak/rgb/image_raw/h264`, with no decode and no re-encode. The robot's airlock carries `CompressedVideo` but not yet `FFMPEGPacket`; the relay goes when it does.
-
-On the robot, Husarion UGV OS carries `/$NS/oak/rgb/image_raw/h264` to its camera node through an inbound H.264 lane, and the camera node passes the stream to the Cockpit as it is. That lane is part of the robot's own configuration (UGV OS), not of this project.
+On the robot, Husarion UGV OS carries `/$NS/oak/rgb/image_raw/compressed` to its camera node through an inbound lane (ros2-airlock 1.30.0 and later carry `FFMPEGPacket`), and the camera node passes the stream to the Cockpit as it is. That lane is part of the robot's own configuration (UGV OS), not of this project. A robot whose UGV OS still carries the older `/$NS/oak/rgb/image_raw/h264` lane shows no OAK video with this project: update UGV OS first.
 
 If the `husarion-depthai` snap is installed on the user computer, stop it first. Two drivers would fight over the camera:
 
@@ -210,7 +207,7 @@ What the launch file sets, and why (`namespace`, `ip` and `bitrate` come from th
 Check that the stream arrives at 30 Hz on the user computer:
 
 ```bash
-docker compose -f compose.mapnav.yaml exec oak bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/h264"
+docker compose -f compose.mapnav.yaml exec oak bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/oak/rgb/image_raw/compressed"
 ```
 
 ## 8. A Slamtec RPLIDAR (S3 or A3) instead of the Ouster
