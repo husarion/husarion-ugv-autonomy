@@ -18,7 +18,9 @@
 # shell or in an env file passed with --env-file. Nothing here starts by itself, after a boot or
 # after a crash: every service is `restart: "no"`. Docker brings an `on-failure` container back
 # when its daemon starts if the container's last exit was non-zero, and a shutdown or a power cut
-# leaves exactly that. Start the stack again yourself; stop it with `down`.
+# leaves exactly that. Start the stack again yourself; stop it with `down`. Installed from the
+# Cockpit, the project starts after a reboot only when its "Start after reboot" switch is on (off
+# by default): the Cockpit's agent starts it then, never Docker.
 #
 # ROS networking comes from the robot, not from a file in this repo (demo-mapnav.md §4):
 # RMW_IMPLEMENTATION, ROS_DOMAIN_ID and ROS_AUTOMATIC_DISCOVERY_RANGE as the robot's Network page

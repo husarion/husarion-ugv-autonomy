@@ -119,7 +119,7 @@ The stack takes the robot's ROS settings and mounts no DDS file:
 
 The default Cyclone setting matches the robot's default network profile, `factory-hardened-mcast`: multicast for participant discovery only, the robot's computers `10.15.20.2` and `10.15.20.3` as unicast peers, and this computer's interface by its address. A robot set to a unicast-only profile (`factory-hardened`, `factory-unicast`) needs a `CYCLONEDDS_URI` without multicast; the Cockpit's installer renders it from the robot's profile. Never copy a profile file from the robot: it names the robot's own interface and a receive buffer an ordinary computer may not allow.
 
-Nothing restarts by itself (`restart: "no"` on every service): not after a boot or a power cut, and not after a crash. A service that stopped shows as exited; start the stack again yourself. A service reads healthy while its ROS processes are alive (`docker compose -f compose.mapnav.yaml ps`).
+Nothing restarts by itself (`restart: "no"` on every service): not after a boot or a power cut, and not after a crash. A service that stopped shows as exited; start the stack again yourself. Installed from the Cockpit, the project starts after a reboot only when you turn on its "Start after reboot" switch (off by default); the Cockpit starts it then, after the same checks as Start. A service reads healthy while its ROS processes are alive (`docker compose -f compose.mapnav.yaml ps`).
 
 **Release the e-stop before sending a goal.** Nav2 reads the robot's e-stop (`/$NS/hardware/e_stop`, which the airlock carries to the user computer) and aborts every goal while it is engaged, or before its first message arrives. The robot latches the e-stop whenever its driver restarts, including after a `components.yaml` save.
 
