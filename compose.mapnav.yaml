@@ -15,8 +15,10 @@
 #
 # The Cockpit installs this project from husarion-project.yaml (its install form sets the
 # variables below); it runs the same way by hand. Every value has a default; override it in the
-# shell or in an env file passed with --env-file. Nothing here starts after a boot by itself:
-# every service restarts only on failure, never `always`.
+# shell or in an env file passed with --env-file. Nothing here starts by itself, after a boot or
+# after a crash: every service is `restart: "no"`. Docker brings an `on-failure` container back
+# when its daemon starts if the container's last exit was non-zero, and a shutdown or a power cut
+# leaves exactly that. Start the stack again yourself; stop it with `down`.
 #
 # ROS networking comes from the robot, not from a file in this repo (demo-mapnav.md §4):
 # RMW_IMPLEMENTATION, ROS_DOMAIN_ID and ROS_AUTOMATIC_DISCOVERY_RANGE as the robot's Network page
@@ -45,7 +47,7 @@ x-health: &health
 x-common-config: &common-config
   network_mode: host
   ipc: host
-  restart: on-failure
+  restart: "no"
   environment: *ros-env
 
 services:
@@ -76,7 +78,7 @@ services:
       - viz:=false
     healthcheck:
       <<: *health
-      test: ["CMD-SHELL", "grep -qa 'os_containe[r]' /proc/[0-9]*/cmdline"]
+      test: ["CMD-SHELL", "grep -qa '__node:=os_drive[r]' /proc/[0-9]*/cmdline"]
 
   # Nav2 on the Ouster's cloud (demo-mapnav.md §4), with the Cockpit's map gateway: the map, the
   # pose, the plan, pause and resume and the saved maps (in ./maps) for the Operate map.
@@ -242,4 +244,4 @@ services:
       - bitrate:=${OAK_BITRATE:-3400000}
     healthcheck:
       <<: *health
-      test: ["CMD-SHELL", "grep -qa 'component_containe[r]' /proc/[0-9]*/cmdline"]
+      test: ["CMD-SHELL", "grep -qa '__node:=oak_containe[r]' /proc/[0-9]*/cmdline"]

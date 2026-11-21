@@ -110,9 +110,11 @@ mapnav-save $name:
     [[ "$name" =~ ^[A-Za-z0-9_-]{1,64}$ ]] || { echo "map name: letters, digits, - and _ only" >&2; exit 2; }
     svc=$(docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar ps --services --status running | grep -E '^navigation(_rplidar)?$' | head -1 || true)
     [ -n "$svc" ] || { echo "the map-nav stack is not running" >&2; exit 1; }
-    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar exec "$svc" \
-      ros2 service call "/${ROBOT_NAMESPACE:-panther}/map_gateway/serialize_map" \
-      slam_toolbox/srv/SerializePoseGraph "{filename: '$name'}"
+    # `exec` skips the image's entrypoint, so ROS is sourced here; the values go in as env.
+    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar exec \
+      -e "MAP_SAVE_NAME=$name" -e "MAP_SAVE_NS=${ROBOT_NAMESPACE:-panther}" "$svc" bash -c \
+      'source /opt/ros/jazzy/setup.bash && source /ros2_ws/install/setup.bash &&
+       ros2 service call "/$MAP_SAVE_NS/map_gateway/serialize_map" slam_toolbox/srv/SerializePoseGraph "{filename: $MAP_SAVE_NAME}"'
 
 # Follow the map-nav stack's logs
 mapnav-logs:
