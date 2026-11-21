@@ -49,7 +49,7 @@ services:
   # Nav2 on the Ouster's cloud (demo-mapnav.md §4), with the Cockpit's map gateway: the map, the
   # pose, the plan, pause and resume and the saved maps (in ./maps) for the Operate map.
   navigation:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
     profiles: [ouster]
     <<: *common-config
     volumes:
@@ -113,7 +113,7 @@ services:
   # robot itself (the DEV09's posts stand in the scan plane, inside the footprint), and the slice
   # makes /<ns>/scan for SLAM and AMCL.
   rplidar_cloud:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
     profiles: [rplidar]
     <<: *common-config
     volumes:
@@ -134,7 +134,7 @@ services:
   # keeps it (demo-mapnav.md §8). ros2 launch refuses an empty lidar_profile:=. The stack reads
   # the rail height from TF at start.
   navigation_rplidar:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8f122be@sha256:f8c5da88d849073cb4c3852ec46b130ce060c855d0f3fa79dbfc91228c216c8d
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
     profiles: [rplidar]
     <<: *common-config
     volumes:
