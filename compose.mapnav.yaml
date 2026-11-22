@@ -227,9 +227,8 @@ services:
   # computer, and the OAK stays out of navigation.
   oak:
     # depthai-docker map-nav 8368f8b: stock depthai-ros 2.13.0, amd64 + arm64.
-    # PLACEHOLDER digest: replace sha256:000... with the digest of husarion/depthai:jazzy-map-nav
-    # once CI has published it from that commit (no relay in it).
-    image: husarion/depthai:jazzy-map-nav@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    # Published by CI from that commit on 2026-11-22; /ros2_ws holds only the launch file.
+    image: husarion/depthai:jazzy-map-nav@sha256:259980585b5411497459711989edd952d0036c40c133e7aae09b11b00fdca25b
     profiles: [oak]
     <<: *common-config
     # depthai's camera as a component. The launch file holds its parameters (demo-mapnav.md §7):
