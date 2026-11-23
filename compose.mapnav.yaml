@@ -50,6 +50,8 @@ x-common-config: &common-config
   network_mode: host
   ipc: host
   restart: "no"
+  # ros2 launch as PID 1 ignores docker's SIGTERM, so Stop (`down`) waited 10 s and killed it
+  stop_signal: SIGINT
   environment: *ros-env
 
 services:
@@ -85,7 +87,7 @@ services:
   # Nav2 on the Ouster's cloud (demo-mapnav.md §4), with the Cockpit's map gateway: the map, the
   # pose, the plan, pause and resume and the saved maps (in ./maps) for the Operate map.
   navigation:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-5af25ce@sha256:a90a862a194641b7a3204d798d5899ee44b5b0cfe59eb68a4e8290212c5ff72d
     profiles: [ouster]
     <<: *common-config
     volumes:
@@ -165,7 +167,7 @@ services:
   # robot itself (the DEV09's posts stand in the scan plane, inside the footprint), and the slice
   # makes /<ns>/scan for SLAM and AMCL.
   rplidar_cloud:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-5af25ce@sha256:a90a862a194641b7a3204d798d5899ee44b5b0cfe59eb68a4e8290212c5ff72d
     profiles: [rplidar]
     <<: *common-config
     command:
@@ -193,7 +195,7 @@ services:
   # keeps it (demo-mapnav.md §8). ros2 launch refuses an empty lidar_profile:=. The stack reads
   # the rail height from TF at start.
   navigation_rplidar:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-c746d09@sha256:cf8e02ca162a70ae7580a0123d4e7b4b2bcc4815cc14c30f8c9877bba96cd7f2
+    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-5af25ce@sha256:a90a862a194641b7a3204d798d5899ee44b5b0cfe59eb68a4e8290212c5ff72d
     profiles: [rplidar]
     <<: *common-config
     volumes:
