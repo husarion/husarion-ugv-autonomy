@@ -225,6 +225,48 @@ services:
       - use_sim_time:=False
     healthcheck: *nav-health
 
+  # Navigator, the Cockpit's map-first Nav2 app, opened from the robot's Cockpit as its own tab
+  # (husarion-cockpit SPEC-MAPNAV-REFPROJECT-UX-2026-11 P5, I6). The browser never reaches this
+  # computer: the robot's Caddy checks the Cockpit login and proxies /navigator/* here over mutual
+  # TLS. Navigator serves HTTPS on the robot-LAN address only, admits only the robot's proxy
+  # certificate (CN cockpit-navigator-proxy, signed by the robot's CA) and only from the robot's
+  # address. The certificates are made by this computer's husarion-agent at install
+  # (/var/lib/husarion-agent-projects/<id>/tls). Its ROS side is navigator_bridge, on loopback.
+  navigator:
+    # Release pending (navigator/v0.3.0): pinned by digest then; refused by the installer until.
+    image: husarion/navigator:0.3.0
+    <<: *common-config
+    environment:
+      NAVIGATOR_TLS_DIR: /tls
+      NAVIGATOR_LISTEN_ADDR: ${USER_COMPUTER_ADDRESS:-10.15.20.3}
+      NAVIGATOR_ALLOW_FROM: ${ROBOT_ADDRESS:-10.15.20.2}
+      HTTP_PORT: "8090"
+      BRIDGE_WS: 127.0.0.1:${NAVIGATOR_BRIDGE_PORT:-8876}
+      ROS_NAMESPACE: ${ROBOT_NAMESPACE:-panther}
+      ROBOT_MODEL: ${ROBOT_MODEL:-panther}
+    volumes:
+      - /var/lib/husarion-agent-projects/husarion-ugv-autonomy/tls:/tls:ro
+      - ./navigator/scenarios:/scenarios
+      - ./navigator/tiles:/tile-cache
+      - ./navigator/geotiffs:/geotiffs
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'caddy' /proc/1/cmdline"]
+
+  # Navigator's own rosbridge, bound to loopback: only Navigator beside it talks to it, so nothing
+  # on the robot's network can publish through it. Same image as the robot's Cockpit bridge.
+  navigator_bridge:
+    image: husarion/rosbridge@sha256:2b910837b672ab8b25d1e3c6cb062bd29cde0d868c68f9b7f5aa7dd28502f737
+    <<: *common-config
+    environment:
+      <<: *ros-env
+      ROSBRIDGE_BIND: 127.0.0.1:${NAVIGATOR_BRIDGE_PORT:-8876}
+      ROSBRIDGE_HEALTH_BIND: 127.0.0.1:${NAVIGATOR_BRIDGE_HEALTH_PORT:-8879}
+      ROSBRIDGE_MEDIA_TRANSPORT: ws
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "grep -qa 'rosbridg[e]' /proc/[0-9]*/cmdline"]
+
   # The OAK's video for the Cockpit (demo-mapnav.md §7). Off unless asked: `--profile oak`.
   # On-chip H.264 from stock depthai-ros as FFMPEGPacket, which the airlock (1.30.0 and later)
   # carries through one inbound lane to the robot's camera node. No raw image leaves this

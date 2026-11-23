@@ -100,6 +100,6 @@ env:
     type: string
     default: 10.15.20.6
     when: {USE_OAK: true}
-data: [maps]
+data: [maps, navigator]
 status:
   ready_when: compose_healthy
