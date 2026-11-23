@@ -125,7 +125,7 @@ Nothing restarts by itself (`restart: "no"` on every service): not after a boot 
 
 The stack runs the Cockpit's map gateway (`husarion_ugv_map_gateway`): it sends the map, the robot's pose and the plan to the Operate map, aligns the map to GNSS, takes pause and resume, and saves maps into `./maps` from the Cockpit.
 
-At start the stack reads the rail's height (`$NS/mount_link` above `$NS/base_footprint`) from the robot's TF. It fails after 30 s if the robot's TF is not visible from the user computer. Everything inside the robot's footprint up to `ROBOT_HEIGHT` is the robot itself (the gate, cameras, antennas) and is dropped from the cloud.
+At start the stack waits for the robot with no deadline (a user computer usually boots faster than the robot), then its preflight reads the rail's height (`$NS/mount_link` above `$NS/base_footprint`) from the robot's TF and checks the LiDAR and its frame, 30 s each; a failed check stops the stack with a report. Everything inside the robot's footprint up to `ROBOT_HEIGHT` is the robot itself (the gate, cameras, antennas) and is dropped from the cloud.
 
 ### LiDAR profiles
 
