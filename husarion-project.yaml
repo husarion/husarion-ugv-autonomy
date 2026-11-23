@@ -15,8 +15,8 @@ needs:
   ram_gb: 8
   internet: install
   sensors_by_profile:
-    ouster: [{kind: lidar_3d}]
-    rplidar: [{kind: lidar_2d}]
+    obs_pointcloud: [{kind: lidar_3d}]
+    obs_laserscan: [{kind: lidar_2d}]
     oak: [{kind: camera}]
 profiles:
   hardware:
@@ -26,28 +26,53 @@ env:
     from: robot.namespace
   - key: ROBOT_MODEL
     from: robot.model
-  - key: LIDAR
-    label: LiDAR
+  - key: OBSERVATION_TOPIC
+    label: LiDAR topic
+    help: The LaserScan or PointCloud2 topic navigation reads. Its frame must be on the robot (Driver files, components.yaml).
+    type: string
+    required: true
+  - key: OBSERVATION_TYPE
+    label: Topic type
     type: choice
-    default: ouster
+    default: pointcloud
     options:
-      - {value: ouster, label: Ouster, compose_profiles: [ouster]}
-      - {value: rplidar_a3, label: Slamtec RPLIDAR A3, compose_profiles: [rplidar]}
-      - {value: rplidar_s3, label: Slamtec RPLIDAR S3, compose_profiles: [rplidar]}
-  - key: LIDAR_PROFILE
-    label: Ouster model
-    help: The OS2-64 cannot see near the robot, so the robot never drives faster than 0.3 m/s with it.
+      - {value: pointcloud, label: PointCloud2, compose_profiles: [obs_pointcloud]}
+      - {value: laserscan, label: LaserScan, compose_profiles: [obs_laserscan]}
+  - key: SENSOR_RANGE
+    label: Limit speed to 0.3 m/s
+    help: Keep it for a 2D LiDAR, which sees one plane only, and for a LiDAR blind near the robot (Ouster OS2-64, 0.8 m).
     type: choice
     default: os2_64
-    when: {LIDAR: ouster}
     options:
-      - {value: os0_32, label: OS0-32}
-      - {value: os2_64, label: OS2-64}
+      - {value: os2_64, label: "Yes"}
+      - {value: os0_32, label: "No"}
+  - key: LIDAR_DRIVER
+    label: Start a LiDAR driver on this computer
+    help: Leave it off when the LiDAR's driver already runs. On, this project starts the driver and takes the sensor's port.
+    type: choice
+    default: none
+    options:
+      - {value: none, label: "No"}
+      - {value: ouster, label: Ouster, compose_profiles: [ouster]}
+      - {value: rplidar, label: Slamtec RPLIDAR, compose_profiles: [rplidar]}
+  - key: RPLIDAR_MODEL
+    label: RPLIDAR model
+    type: choice
+    default: a3
+    when: {LIDAR_DRIVER: rplidar}
+    options:
+      - {value: a3, label: A3}
+      - {value: s3, label: S3}
   - key: OUSTER_HOSTNAME
     label: Ouster address
     type: string
     default: 10.15.20.5
-    when: {LIDAR: ouster}
+    when: {LIDAR_DRIVER: ouster}
+  - key: RPLIDAR_DEVICE
+    label: RPLIDAR serial port
+    type: string
+    default: /dev/ttyUSB0
+    when: {LIDAR_DRIVER: rplidar}
   - key: ROBOT_HEIGHT
     label: Robot height in metres
     help: The top of the robot with everything mounted on it. Measure your robot.

@@ -87,35 +87,35 @@ undock:
 setup-os:
     bash setup_os.sh
 
-# Map-nav (demo-mapnav.md): Nav2 behind the airlock of Husarion UGV OS, with an Ouster. Set ROBOT_NAMESPACE first.
+# Map-nav (demo-mapnav.md): Nav2 behind the airlock of Husarion UGV OS, on an Ouster's cloud (OBSERVATION_TOPIC, default /<ns>/points). Set ROBOT_NAMESPACE first.
 mapnav-up:
-    docker compose -f compose.mapnav.yaml --profile ouster up -d
+    docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster up -d
 
 # Start the map-nav stack with the Ouster and the OAK's video for the Cockpit (demo-mapnav.md §7)
 mapnav-oak-up:
-    docker compose -f compose.mapnav.yaml --profile ouster --profile oak up -d
+    docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster --profile oak up -d
 
-# Start the map-nav stack with a Slamtec RPLIDAR instead of the Ouster: RPLIDAR_MODEL a3 (default) or s3 (demo-mapnav.md §8)
+# Start the map-nav stack on a Slamtec RPLIDAR's scan instead of the Ouster: RPLIDAR_MODEL a3 (default) or s3 (demo-mapnav.md §8)
 mapnav-rplidar-up:
-    docker compose -f compose.mapnav.yaml --profile rplidar up -d
+    docker compose -f compose.mapnav.yaml --profile obs_laserscan --profile rplidar up -d
 
-# Stop the map-nav stack, whichever LiDAR and whether or not the OAK's service runs
+# Stop the map-nav stack, whichever navigation and LiDAR driver and whether or not the OAK's service runs
 mapnav-down:
-    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak down
+    docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile obs_laserscan --profile ouster --profile rplidar --profile oak down
 
 # Save the map being built as ./maps/<name>/ with its sidecar (demo-mapnav.md §5): letters, digits, - and _
 mapnav-save $name:
     #!/usr/bin/env bash
     set -euo pipefail
     [[ "$name" =~ ^[A-Za-z0-9_-]{1,64}$ ]] || { echo "map name: letters, digits, - and _ only" >&2; exit 2; }
-    svc=$(docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar ps --services --status running | grep -E '^navigation(_rplidar)?$' | head -1 || true)
+    svc=$(docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile obs_laserscan ps --services --status running | grep -E '^navigation(_scan)?$' | head -1 || true)
     [ -n "$svc" ] || { echo "the map-nav stack is not running" >&2; exit 1; }
     # `exec` skips the image's entrypoint, so ROS is sourced here; the values go in as env.
-    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar exec \
+    docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile obs_laserscan exec \
       -e "MAP_SAVE_NAME=$name" -e "MAP_SAVE_NS=${ROBOT_NAMESPACE:-panther}" "$svc" bash -c \
       'source /opt/ros/jazzy/setup.bash && source /ros2_ws/install/setup.bash &&
        ros2 service call "/$MAP_SAVE_NS/map_gateway/serialize_map" slam_toolbox/srv/SerializePoseGraph "{filename: $MAP_SAVE_NAME}"'
 
 # Follow the map-nav stack's logs
 mapnav-logs:
-    docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak logs -f
+    docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile obs_laserscan --profile ouster --profile rplidar --profile oak logs -f

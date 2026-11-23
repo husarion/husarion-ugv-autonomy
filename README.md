@@ -13,4 +13,4 @@ We recommend starting with the simulation demo, as it lets you explore the auton
 
 - [Simulation Demo](./demo-sim.md)
 - [Hardware Demo](./demo-hw.md)
-- [Map-nav Demo](./demo-mapnav.md): Nav2 with an Ouster 3D LiDAR (or a Slamtec RPLIDAR A3 or S3, not yet driven on a robot) on a robot running Husarion UGV OS, behind its airlock, with a collision monitor
+- [Map-nav Demo](./demo-mapnav.md): Nav2 on one LiDAR topic, an Ouster 3D LiDAR's cloud or a Slamtec RPLIDAR A3 or S3 scan (not yet driven on a robot), on a robot running Husarion UGV OS, behind its airlock, with a collision monitor

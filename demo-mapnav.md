@@ -1,6 +1,6 @@
 # Map-nav demo: Nav2 behind the airlock of Husarion UGV OS
 
-This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user computer of a Panther or Lynx with Husarion UGV OS. It uses an Ouster 3D LiDAR, or a Slamtec RPLIDAR S3 or A3 2D LiDAR (§8, not yet driven on a robot), whose driver runs in the same compose file. On UGV OS the robot's built-in computer runs the airlock, which carries exactly one drive input from the user computer: `/<namespace>/autonomous/cmd_vel`. The stack in `compose.mapnav.yaml` is built for that:
+This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user computer of a Panther or Lynx with Husarion UGV OS. It reads one LiDAR topic: an Ouster 3D LiDAR's cloud, or a Slamtec RPLIDAR S3 or A3 2D LiDAR's scan (§8, not yet driven on a robot). The LiDAR's driver can run in the same compose file or anywhere else on the robot's network. On UGV OS the robot's built-in computer runs the airlock, which carries exactly one drive input from the user computer: `/<namespace>/autonomous/cmd_vel`. The stack in `compose.mapnav.yaml` is built for that:
 
 - **The namespace is your robot's.** UGV OS names a robot `{model}_{serial}`, for example `panther_0957`. Every topic, action and frame of the stack follows it: `/<ns>/navigate_to_pose`, `<ns>/map`, `<ns>/base_link`.
 - **Nav2's output** is a stamped twist on `/<ns>/autonomous/cmd_vel`.
@@ -8,7 +8,7 @@ This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user comp
 - **Recoveries pass the same chain.** Spin and back-up go through the smoother and the collision monitor too.
 - **The 3D cloud also feeds the costmaps.** A 2D slice of it, 0.25 m to 1.0 m above the ground, feeds slam_toolbox and AMCL.
 
-- **One LiDAR, chosen by a Compose profile.** `--profile ouster` runs the Ouster's driver and the stack on its cloud (§2 to §6); `--profile rplidar` runs an RPLIDAR's driver (`RPLIDAR_MODEL` `s3` or `a3`) and the stack on its 2D scan (§8). Give exactly one. With neither, nothing starts.
+- **One observation topic, its type chosen by a Compose profile.** `OBSERVATION_TOPIC` names the topic. `--profile obs_pointcloud` runs the stack on a 3D cloud (§2 to §6); `--profile obs_laserscan` runs it on a 2D scan (§8). Give exactly one; with neither, navigation does not start. The LiDAR's driver is a profile of its own, added when this computer should run it: `--profile ouster` (publishes `/<ns>/points`) or `--profile rplidar` (publishes `/<ns>/rplidar/scan`, `RPLIDAR_MODEL` `s3` or `a3`).
 
 - **The OAK's video, if you ask for it** (§7): the OAK encodes H.264 on its own chip, and the airlock carries that stream to the robot's Cockpit. No raw image leaves the user computer, and the OAK stays out of navigation.
 
@@ -58,7 +58,7 @@ Check: drive the robot towards a wall. In the Cockpit's 3D view the scan must sh
 
 ## 3. The Ouster driver
 
-The driver runs as the `ouster` service of `compose.mapnav.yaml`, with the same ROS networking as Nav2 (§4). Set the sensor to the static address `10.15.20.5` first (Ouster's web page or its HTTP API), or set `OUSTER_HOSTNAME`.
+The driver runs as the `ouster` service of `compose.mapnav.yaml` (`--profile ouster`), with the same ROS networking as Nav2 (§4). Leave the profile out when the Ouster's driver already runs elsewhere, and point `OBSERVATION_TOPIC` at its cloud. Set the sensor to the static address `10.15.20.5` first (Ouster's web page or its HTTP API), or set `OUSTER_HOSTNAME`.
 
 If the `husarion-ouster` snap is installed on the user computer, stop it first. Two drivers would fight over the sensor:
 
@@ -88,8 +88,8 @@ docker compose -f compose.mapnav.yaml exec ouster bash -c "source /opt/ros/jazzy
 ## 4. Start
 
 ```bash
-ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile ouster up -d
-docker compose -f compose.mapnav.yaml --profile ouster logs -f
+OBSERVATION_TOPIC=/$NS/points ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster up -d
+docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster logs -f
 ```
 
 The settings, each with its default:
@@ -98,14 +98,15 @@ The settings, each with its default:
 | -- | -- | -- |
 | `ROBOT_NAMESPACE` | `panther` | Your robot's namespace |
 | `ROBOT_MODEL` | `panther` | `panther` or `lynx` |
-| `OBSERVATION_TOPIC` | `/$ROBOT_NAMESPACE/points` | The LiDAR's cloud |
-| `LIDAR_PROFILE` | `os0_32` | `os0_32` or `os2_64`, below |
+| `OBSERVATION_TOPIC` | `/$ROBOT_NAMESPACE/points` (`obs_pointcloud`), `/$ROBOT_NAMESPACE/rplidar/scan` (`obs_laserscan`) | The topic navigation reads: a `PointCloud2` with `--profile obs_pointcloud`, a `LaserScan` with `--profile obs_laserscan` (§8) |
+| `SENSOR_RANGE` | `os2_64` | `os2_64` (at most 0.3 m/s) or `os0_32` (no cap), below. Both navigation services read it |
 | `ROBOT_HEIGHT` | `0.7` | The top of your robot with everything mounted on it, in metres above the ground. The costmaps and the collision monitor treat points up to this height plus 0.2 m as obstacles, so a table edge the robot would hit stops it. **Measure your robot** |
 | `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` | `0.25`, `1.0` | The 2D slice for SLAM and AMCL, in metres above the ground: above grass and kerbs, below the canopy. On a slope the ground can enter the slice at range; raise the floor if you see arcs of ground in the map |
 | `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
 | `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
-| `RPLIDAR_MODEL`, `RPLIDAR_DEVICE`, `RPLIDAR_FRAME`, `RPLIDAR_SPEED_CAP` | `a3` (or from `LIDAR`: `rplidar_a3`, `rplidar_s3`), `/dev/ttyUSB0`, `laser`, `os2_64` | With `--profile rplidar` (§8) instead of `--profile ouster`: the model (`a3` or `s3`), its serial port, its frame below the namespace, and its 0.3 m/s speed cap (`os0_32`: none) |
+| `OUSTER_HOSTNAME` | `10.15.20.5` | With `--profile ouster` (§3): the sensor's address |
+| `RPLIDAR_MODEL`, `RPLIDAR_DEVICE`, `RPLIDAR_FRAME` | `a3`, `/dev/ttyUSB0`, `laser` | With `--profile rplidar` (§8): the model (`a3` or `s3`), its serial port and its frame below the namespace |
 
 ### ROS networking
 
@@ -129,6 +130,8 @@ At start the stack waits for the robot with no deadline (a user computer usually
 
 ### LiDAR profiles
 
+`SENSOR_RANGE` picks the column, for either observation profile. The default is `os2_64`, the cautious one; with an OS0-32 set `os0_32` to drive at the stack's own speed.
+
 | | `os0_32` | `os2_64` |
 | -- | -- | -- |
 | Sensor | Ouster OS0-32 (90° vertical field) | Ouster OS2-64 (22.5° vertical field) |
@@ -144,7 +147,7 @@ With `SLAM=True` slam_toolbox maps. The map is published every 5 s, and an autos
 A saved map that AMCL can start on is a directory `./maps/<name>/` with `map.yaml`, its image and a sidecar `map.georef.yaml`. The sidecar carries `map_sha256`, the sha256 of the map image, and `saved_pose`, the robot's pose `{x, y, yaw}` in the map frame when the map was saved. AMCL starts at that pose, so start the robot where the map was saved:
 
 ```bash
-ROBOT_NAMESPACE=$NS SLAM=False MAP_NAME=<name> docker compose -f compose.mapnav.yaml --profile ouster up -d
+OBSERVATION_TOPIC=/$NS/points ROBOT_NAMESPACE=$NS SLAM=False MAP_NAME=<name> docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster up -d
 ```
 
 The stack refuses to start when the sidecar is missing, has no `saved_pose`, or belongs to another image. AMCL never starts at 0, 0, 0 on a saved map by accident.
@@ -160,10 +163,10 @@ The map gateway writes the pair, the sidecar and slam_toolbox's pose graph, and 
 ## 6. Stop
 
 ```bash
-docker compose -f compose.mapnav.yaml --profile ouster --profile rplidar --profile oak down
+docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile obs_laserscan --profile ouster --profile rplidar --profile oak down
 ```
 
-Naming every profile stops whichever LiDAR runs and the OAK's service when it runs (§7); a profile that is not running changes nothing.
+Naming every profile stops whichever navigation and LiDAR driver run and the OAK's service when it runs (§7); a profile that is not running changes nothing.
 
 ## 7. The OAK's video in the Cockpit (optional)
 
@@ -189,7 +192,7 @@ Describe the OAK in `components.yaml` as well (Manage › Robot › Driver files
 Start the stack with the OAK:
 
 ```bash
-ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile ouster --profile oak up -d
+OBSERVATION_TOPIC=/$NS/points ROBOT_NAMESPACE=$NS docker compose -f compose.mapnav.yaml --profile obs_pointcloud --profile ouster --profile oak up -d
 ```
 
 What the launch file sets, and why (`namespace`, `ip` and `bitrate` come from the compose file; the rest is fixed in the launch file, `depthai-docker` `launch/oak_h264.launch.py`):
@@ -214,11 +217,11 @@ docker compose -f compose.mapnav.yaml exec oak bash -c "source /opt/ros/jazzy/se
 
 > **What has been tested.** The **A3**: its driver on a real A3 (on a user computer, 8.2 scans a second, 1800 points, scan mode `Sensitivity`) and the whole stack, crop included, on that real scan with the robot standing still; not yet driving a robot. The **S3**: only against a simulated S3 (a fake robot replaying the driver's scan geometry), not on a sensor or a robot. Watch the robot closely the first time it drives on either, with the e-stop in reach.
 
-The `rplidar` profile replaces the `ouster` profile: it runs the RPLIDAR's driver (`rplidar`, from `husarion/rplidar`, sllidar_ros2) and Nav2 on its 2D scan (`navigation_rplidar`). Use it instead of `--profile ouster`, never with it. `RPLIDAR_MODEL` names the sensor:
+A 2D scan takes the `obs_laserscan` profile in place of `obs_pointcloud`: it runs `scan_cloud`, which turns the scan into a cloud, and Nav2 on that cloud (`navigation_scan`). The `rplidar` profile adds the RPLIDAR's driver (`rplidar`, from `husarion/rplidar`, sllidar_ros2), which publishes `/$NS/rplidar/scan`; leave it out when the driver already runs elsewhere and point `OBSERVATION_TOPIC` at its scan. `RPLIDAR_MODEL` names the sensor:
 
 ```bash
-ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile rplidar up -d
-docker compose -f compose.mapnav.yaml --profile rplidar logs -f
+OBSERVATION_TOPIC=/$NS/rplidar/scan ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile obs_laserscan --profile rplidar up -d
+docker compose -f compose.mapnav.yaml --profile obs_laserscan --profile rplidar logs -f
 ```
 
 | `RPLIDAR_MODEL` | Sensor | Serial rate | Scan mode | `components.yaml` type |
@@ -228,14 +231,14 @@ docker compose -f compose.mapnav.yaml --profile rplidar logs -f
 
 The rate and the mode are those of sllidar_ros2's own launch file for each model. Any other value stops the driver at start with a message naming the two.
 
-Everything else is as above: the clock (§1), the e-stop, `SLAM`, `MAP_NAME` and a saved map (§5), the OAK (`--profile oak`, §7), stopping (§6). `LIDAR_PROFILE`, `ROBOT_HEIGHT`, `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` and `OBSERVATION_TOPIC` belong to the Ouster and do nothing here.
+Everything else is as above: the clock (§1), the e-stop, `SLAM`, `MAP_NAME` and a saved map (§5), the OAK (`--profile oak`, §7), stopping (§6). `ROBOT_HEIGHT` and `SENSOR_RANGE` apply as for the cloud; `SCAN_MIN_HEIGHT` and `SCAN_MAX_HEIGHT` belong to `obs_pointcloud` and do nothing here.
 
-**The robot is cropped out of the scan, as from the Ouster's cloud.** The driver publishes its raw scan on `/$NS/rplidar/scan`. A third service, `rplidar_cloud` (pointcloud_to_laserscan's `laserscan_to_pointcloud_node`, in the autonomy image), turns it into a point cloud, `/$NS/rplidar/points`, and from there the stack is the Ouster's (§4): the crop box drops every point inside the robot's footprint up to `ROBOT_HEIGHT` (default 0.7 m), so the DEV09's posts and anything else of the robot in the scan plane are not obstacles; the slice turns what is left back into `/$NS/scan` for slam_toolbox and AMCL; both costmaps and the collision monitor (the same stop and slowdown polygons) read the cropped cloud. The slice is 0.05 m to 2.0 m above the ground, so the scan plane is inside it wherever the sensor is mounted. As with the Ouster, the stack reads the rail height (`$NS/mount_link`) from the robot's TF at start. A real obstacle inside the footprint is cropped out too, exactly as with the Ouster.
+**The robot is cropped out of the scan, as from the Ouster's cloud.** The driver publishes its raw scan on `/$NS/rplidar/scan`. The service `scan_cloud` (pointcloud_to_laserscan's `laserscan_to_pointcloud_node`, in the autonomy image) turns the scan on `OBSERVATION_TOPIC` into a point cloud, `/$NS/observation/points`, and from there the stack is the Ouster's (§4): the crop box drops every point inside the robot's footprint up to `ROBOT_HEIGHT` (default 0.7 m), so the DEV09's posts and anything else of the robot in the scan plane are not obstacles; the slice turns what is left back into `/$NS/scan` for slam_toolbox and AMCL; both costmaps and the collision monitor (the same stop and slowdown polygons) read the cropped cloud. The slice is 0.05 m to 2.0 m above the ground, so the scan plane is inside it wherever the sensor is mounted. As with the Ouster, the stack reads the rail height (`$NS/mount_link`) from the robot's TF at start. A real obstacle inside the footprint is cropped out too, exactly as with the Ouster.
 
-**Linear speed is capped at 0.3 m/s, at all times**, for either model, in the controller and the velocity smoother, the same cap as the OS2-64 (§4), because a 2D LiDAR cannot see what is below or above its plane. The compose file does it with the launch argument `lidar_profile:=os2_64` (`RPLIDAR_SPEED_CAP`, default `os2_64`); with it the slice also starts at 0.8 m (0.5 m with `os0_32`), which only thins SLAM's scan: the collision monitor reads the cropped cloud from the footprint outwards. To drive at the stack's own speed (0.8 m/s) once you have judged your site, remove the cap knowingly by choosing `os0_32`, the profile with no cap:
+**Linear speed is capped at 0.3 m/s, at all times**, for either model, in the controller and the velocity smoother, the same cap as the OS2-64 (§4), because a 2D LiDAR cannot see what is below or above its plane. The compose file does it with the launch argument `lidar_profile:=os2_64` (`SENSOR_RANGE`, default `os2_64`); with it the slice also starts at 0.8 m (0.5 m with `os0_32`), which only thins SLAM's scan: the collision monitor reads the cropped cloud from the footprint outwards. To drive at the stack's own speed (0.8 m/s) once you have judged your site, remove the cap knowingly by choosing `os0_32`, the profile with no cap:
 
 ```bash
-RPLIDAR_SPEED_CAP=os0_32 ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile rplidar up -d
+SENSOR_RANGE=os0_32 OBSERVATION_TOPIC=/$NS/rplidar/scan ROBOT_NAMESPACE=$NS RPLIDAR_MODEL=a3 docker compose -f compose.mapnav.yaml --profile obs_laserscan --profile rplidar up -d
 ```
 
 Empty or unset keeps the cap, and any other value stops the stack at start. There is no speed in between with this image.
@@ -281,22 +284,4 @@ Check: the scan arrives (about 8 Hz from the A3 measured here, about 10 Hz from 
 docker compose -f compose.mapnav.yaml exec rplidar bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic hz /$NS/scan"
 ```
 
-**In the Cockpit's installer** (when it ships) the choice is a knob of the project, not commands: the LiDAR is `ouster` (profile `ouster`, with the Ouster model as a second field) or `rplidar` (profile `rplidar`, with the RPLIDAR model as a second field), and the installer passes the matching `--profile`. Until the manifest schema is published, the draft is:
-
-```yaml
-- key: LIDAR
-  label: LiDAR
-  type: choice
-  default: ouster
-  options:
-    - {value: ouster, label: Ouster, compose_profiles: [ouster]}
-    - {value: rplidar, label: Slamtec RPLIDAR, compose_profiles: [rplidar]}
-- key: RPLIDAR_MODEL
-  label: RPLIDAR model
-  type: choice
-  default: a3
-  when: {LIDAR: rplidar}
-  options:
-    - {value: a3, label: RPLIDAR A3}
-    - {value: s3, label: RPLIDAR S3}
-```
+**In the Cockpit's installer** the choice is a set of knobs, not commands (`husarion-project.yaml`): the LiDAR topic (`OBSERVATION_TOPIC`) and its type (`OBSERVATION_TYPE`: `pointcloud` or `laserscan`, which picks `obs_pointcloud` or `obs_laserscan`), the speed cap (`SENSOR_RANGE`), and whether this computer starts a driver (`LIDAR_DRIVER`: `none`, `ouster` or `rplidar`, with `OUSTER_HOSTNAME`, or `RPLIDAR_MODEL` and `RPLIDAR_DEVICE`). The installer passes the matching `--profile`s.
