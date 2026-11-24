@@ -8,7 +8,7 @@ This is Nav2 with slam_toolbox, or AMCL on a saved map, running on the user comp
 - **Recoveries pass the same chain.** Spin and back-up go through the smoother and the collision monitor too.
 - **The 3D cloud also feeds the costmaps.** A 2D slice of it, 0.25 m to 1.0 m above the ground, feeds slam_toolbox and AMCL.
 
-- **One observation topic, its type chosen by a Compose profile.** `OBSERVATION_TOPIC` names the topic. `--profile obs_pointcloud` runs the stack on a 3D cloud (§2 to §6); `--profile obs_laserscan` runs it on a 2D scan (§8). Give exactly one; with neither, navigation does not start. The LiDAR's driver is a profile of its own, added when this computer should run it: `--profile ouster` (publishes `/<ns>/points`) or `--profile rplidar` (publishes `/<ns>/rplidar/scan`, `RPLIDAR_MODEL` `s3` or `a3`).
+- **One observation topic, its type chosen by a Compose profile.** `OBSERVATION_TOPIC` names the topic. `--profile obs_pointcloud` runs the stack on a 3D cloud (§2 to §6); `--profile obs_laserscan` runs it on a 2D scan (§8). Give exactly one; with neither, navigation does not start. The LiDAR's driver is a profile of its own, added when this computer should run it: `--profile ouster` (publishes `/<ns>/points`) or `--profile rplidar` (publishes `/<ns>/rplidar/scan`, `RPLIDAR_MODEL` `s3` or `a3`). The Cockpit's install of this project never adds them: there the driver runs on its own (a sensor snap, your container, or later the LiDAR reference project), and the form asks only for the topic.
 
 - **The OAK's video, if you ask for it** (§7): the OAK encodes H.264 on its own chip, and the airlock carries that stream to the robot's Cockpit. No raw image leaves the user computer, and the OAK stays out of navigation.
 
