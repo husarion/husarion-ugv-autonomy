@@ -102,7 +102,7 @@ The settings, each with its default:
 | `SENSOR_RANGE` | `os2_64` | `os2_64` (at most 0.3 m/s) or `os0_32` (no cap), below. Both navigation services read it |
 | `ROBOT_HEIGHT` | `0.7` | The top of your robot with everything mounted on it, in metres above the ground. The costmaps and the collision monitor treat points up to this height plus 0.2 m as obstacles, so a table edge the robot would hit stops it. **Measure your robot** |
 | `SCAN_MIN_HEIGHT`, `SCAN_MAX_HEIGHT` | `0.25`, `1.0` | The 2D slice for SLAM and AMCL, in metres above the ground: above grass and kerbs, below the canopy. On a slope the ground can enter the slice at range; raise the floor if you see arcs of ground in the map |
-| `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map |
+| `SLAM` | `True` | `True`: map with slam_toolbox. `False`: AMCL on a saved map. Installed from the Cockpit, Navigator's Settings switches it while the project runs |
 | `MAP_NAME` | `map` | With `SLAM=False`, the saved map's directory under `./maps` |
 | `OAK_IP`, `OAK_BITRATE` | `10.15.20.6`, `3400000` | With `--profile oak` (§7): the OAK's address and its H.264 bitrate in bit/s |
 | `OUSTER_HOSTNAME` | `10.15.20.5` | With `--profile ouster` (§3): the sensor's address |

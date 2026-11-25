@@ -57,11 +57,13 @@ env:
     help: Off, the robot localizes on a saved map and starts where that map was saved.
     type: bool
     default: true
+    runtime: true
   - key: MAP_NAME
     label: Saved map
     type: string
     required: true
     when: {SLAM: false}
+    runtime: true
   - key: USE_OAK
     label: Luxonis OAK camera
     help: The OAK's video in the Cockpit. Leave off without an OAK connected.
