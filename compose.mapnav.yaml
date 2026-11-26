@@ -10,12 +10,13 @@
 #
 # - `obs_pointcloud`: a 3D cloud; the stack crops the robot's body out of it and slices it into the
 #   2D scan for SLAM and AMCL, and the costmaps and the collision monitor use the cloud.
-# - `obs_laserscan`: a 2D scan, turned into a cloud first, so it takes the same crop box (the
-#   robot's own posts stand in the scan plane) and a slice wide enough to hold the scan plane.
+# - `obs_laserscan`: a 2D scan; the stack turns it into a cloud first, so it takes the same crop box
+#   (the robot's own posts and cables stand in the scan plane), and treats it as a 2D LiDAR.
 # With neither profile, navigation does not start. The LiDAR's driver may run anywhere on the
 # robot's network; this file can also start one (profiles `ouster` and `rplidar`, below).
 # SENSOR_RANGE caps linear speed: os2_64 (the default) at 0.3 m/s at all times, for a 2D LiDAR
-# (one plane only) or a LiDAR blind near the robot (OS2-64: 0.8 m); os0_32 removes the cap.
+# (one plane only) or a LiDAR blind near the robot (OS2-64: 0.8 m); os0_32 removes the cap. For a
+# 2D scan it only caps the speed: the Ouster's blind zone does not apply to it.
 # The OAK's video for the Cockpit is one more service behind the `oak` profile (demo-mapnav.md §7).
 #
 # The Cockpit installs this project from husarion-project.yaml (its install form sets the
@@ -166,36 +167,12 @@ services:
       <<: *health
       test: ["CMD-SHELL", "grep -qa 'sllidar_nod[e]' /proc/[0-9]*/cmdline"]
 
-  # A 2D scan (OBSERVATION_TOPIC) as a point cloud on /<ns>/observation/points, in the scan's own
-  # frame, so the 2D path runs through the same crop box and slice as a 3D cloud: the crop box drops
-  # the robot itself (the DEV09's posts stand in the scan plane, inside the footprint), and the
-  # slice makes /<ns>/scan for SLAM and AMCL.
-  scan_cloud:
-    image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8a734db@sha256:b022d63c023ccd5fe3521f046c41fe72dbc18656626cff437231a4a28b693013
-    profiles: [obs_laserscan]
-    <<: *common-config
-    command:
-      - ros2
-      - run
-      - pointcloud_to_laserscan
-      - laserscan_to_pointcloud_node
-      - --ros-args
-      - -r
-      - __ns:=/${ROBOT_NAMESPACE:-panther}
-      - -r
-      - scan_in:=${OBSERVATION_TOPIC:-/${ROBOT_NAMESPACE:-panther}/rplidar/scan}
-      - -r
-      - cloud:=observation/points
-    healthcheck:
-      <<: *health
-      test: ["CMD-SHELL", "grep -qa 'laserscan_to_pointcloud_nod[e]' /proc/[0-9]*/cmdline"]
-
-  # Nav2 on a 2D scan's cloud: the crop box drops everything inside the footprint up to
-  # ROBOT_HEIGHT, the slice (0.05 m to 2.0 m, so the scan plane is in it wherever the sensor is
-  # mounted) feeds SLAM and AMCL, and the costmaps and the collision monitor read the cropped cloud.
-  # A 2D LiDAR sees one plane only: keep SENSOR_RANGE os2_64 (0.3 m/s at most) unless you know the
-  # path is clear above and below that plane. ros2 launch refuses an empty lidar_profile:=. The
-  # preflight checks the scan the user gave, not the converted cloud.
+  # Nav2 on a 2D scan (OBSERVATION_TOPIC): the stack turns it into a cloud, the crop box drops the
+  # robot's box plus 5 cm past its sides up to ROBOT_HEIGHT, the slice (0.05 m to 2.0 m, so the scan
+  # plane is in it wherever the sensor is mounted) feeds SLAM and AMCL, and the costmaps and the
+  # collision monitor read the cropped cloud. A 2D LiDAR sees one plane only: keep SENSOR_RANGE
+  # os2_64 (0.3 m/s at most) unless you know the path is clear above and below that plane. ros2
+  # launch refuses an empty lidar_profile:=.
   navigation_scan:
     image: husarion/husarion-ugv-autonomy:jazzy-map-nav-8a734db@sha256:b022d63c023ccd5fe3521f046c41fe72dbc18656626cff437231a4a28b693013
     profiles: [obs_laserscan]
@@ -209,12 +186,10 @@ services:
       - bringup_launch.py
       - namespace:=${ROBOT_NAMESPACE:-panther}
       - robot_model:=${ROBOT_MODEL:-panther}
-      - observation_topic:=/${ROBOT_NAMESPACE:-panther}/observation/points
-      - observation_topic_type:=pointcloud
+      - observation_topic:=${OBSERVATION_TOPIC:-/${ROBOT_NAMESPACE:-panther}/rplidar/scan}
+      - observation_topic_type:=laserscan
       - lidar_profile:=${SENSOR_RANGE:-os2_64}
       - robot_height:=${ROBOT_HEIGHT:-0.7}
-      - scan_min_height:=0.05
-      - scan_max_height:=2.0
       - use_collision_monitor:=True
       - cmd_vel_out:=autonomous/cmd_vel
       - use_map_gateway:=True
